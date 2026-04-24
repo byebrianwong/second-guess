@@ -1,0 +1,31 @@
+export const BABY_SHOWER_QUESTIONS: string[] = [
+  "Name a toddler's favorite toy.",
+  "Name a Disney animated movie.",
+  "Name a baby's first word.",
+  "Name a vegetable kids hate.",
+  "Name a nursery rhyme.",
+  "Name a Pixar movie.",
+  "Name something you'd find in a diaper bag.",
+  "Name a kids' breakfast cereal.",
+  "Name a kid's Halloween costume.",
+  "Name a baby animal.",
+  "Name a children's book.",
+  "Name a thing parents bribe their kids with.",
+  "Name a kid's TV show.",
+  "Name something pregnant women crave.",
+  "Name a thing you'd see at a playground.",
+  "Name a flavor of baby food.",
+  "Name a baby shower gift.",
+  "Name a song you'd sing a baby to sleep with.",
+  "Name a famous fictional baby.",
+  "Name a snack a parent secretly steals from their kid.",
+  "Name something parents say way too often.",
+  "Name a place parents take kids on a rainy day.",
+  "Name something on a kid's lunchbox.",
+  "Name a chore parents trick their kids into doing.",
+  "Name a thing in a kid's bath.",
+];
+
+export const STARTER_PACKS: Record<string, string[]> = {
+  baby_shower: BABY_SHOWER_QUESTIONS,
+};

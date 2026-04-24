@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Second Guess
 
-## Getting Started
+A real-time party game where the most popular answer is worth **zero**. Aim for #2.
 
-First, run the development server:
+Built for baby showers, birthdays, and any group who's tired of the obvious answer.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Mechanics
+
+- Host creates a game, gets a 4-letter code, and edits a list of questions tangentially related to a theme (e.g. "Name a toddler's favorite toy").
+- Players join from their phones with the code + a name + an avatar emoji.
+- Each round, players answer a question with one short free-text response.
+- After everyone's in, the host reviews the grouped answers (it auto-merges "lego" / "Legos" / "LEGO", and the host can hand-merge near-synonyms like "binky" / "pacifier").
+- Reveal animation: bar graph tabulates, then unveils #1 (0 pts — easy collusion), #2 (3 pts), #3 (2 pts), #4 (1 pt). Each player sees how they did.
+- Highest cumulative score wins.
+
+## Stack
+
+- **Next.js 16** (App Router) on **Vercel**
+- **Supabase** Postgres + Realtime (Postgres Changes for game state, Broadcast for emoji reactions). No Supabase Auth — players are anonymous, identified by a UUID stored in `localStorage`.
+- **Tailwind CSS v4** + **Framer Motion**
+- TypeScript
+
+## Setup
+
+### 1. Supabase project
+
+1. Create a new project at [supabase.com](https://supabase.com).
+2. In the SQL editor, paste and run the contents of [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql). This creates the schema, RLS policies, the `finalize_question` RPC, and enables Realtime on the gameplay tables.
+3. Copy your project URL and anon key from **Settings → API**.
+
+### 2. Local env
+
+```sh
+cp .env.local.example .env.local
+# then edit .env.local with your Supabase values
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Install + run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```sh
+pnpm install
+pnpm dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000).
 
-## Learn More
+## Trying it locally
 
-To learn more about Next.js, take a look at the following resources:
+You'll want three browser windows to feel the realtime flow:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. **Window A** (host): go to `/`, click *Host a new game*, edit the question list, click *Create*. You'll be taken to `/host/ABCD` showing the room code.
+2. **Window B & C** (players): open `/`, type the same code, join with different names + avatars. They'll appear in the host's lobby live.
+3. Host clicks *Start*. Players see the question, type answers, host watches the count tick up.
+4. Host clicks *End question*, sees the auto-grouped answers, optionally taps two groups to merge them, then clicks *Reveal*.
+5. Animation runs on every screen.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Refresh window B mid-question — you stay in the same game with your points intact (player UUID lives in localStorage per game code).
 
-## Deploy on Vercel
+## Limitations (intentional, for MVP)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Cleared browser data = lost session.** A player who clears site data has to rejoin with a different name and starts at 0 points. The audience is in the same room — they can shout across.
+- **Permissive RLS.** Mutations are allowed for anyone with the anon key and the right ids. The 4-letter code + random `host_secret` are the only soft locks. Acceptable for an ephemeral party game; lock down via Edge Functions if you ever ship this publicly at scale.
+- **No profanity filter.** Host can re-end and skip if needed.
+- **No scheduled cleanup of old games.** They sit in `lobby` / `active` until the host clicks End, then can be reused.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Project layout
+
+```
+app/
+  page.tsx                 # landing — join code or host new
+  host/new/page.tsx        # host setup: questions, theme
+  host/[code]/page.tsx     # host control panel + review screen + reveal mirror
+  play/[code]/page.tsx     # unified player page (lobby/answer/wait/reveal/leaderboard)
+  _components/             # Lobby, Reactions, RevealStage, ui primitives
+
+lib/
+  supabase/client.ts       # browser Supabase client
+  supabase/realtime.ts     # useGameChannel hook (Postgres Changes + Broadcast)
+  scoring/normalize.ts     # answer normalization + alias dictionary + ranking
+  session/storage.ts       # localStorage helpers (player UUIDs, host secrets)
+  data/baby-shower-questions.ts
+  actions.ts               # createGame / joinGame / submitAnswer / endQuestion / revealQuestion / nextQuestion / merge
+
+supabase/migrations/0001_init.sql
+```
+
+## Future ideas
+
+- More themes: birthdays, wedding showers, holidays. Each is just a starter question pack + alias dict.
+- Public game discovery / replay link.
+- "Spectator" mode for the projector.
+- Tighter RLS via Supabase Edge Functions if abuse becomes a concern.
