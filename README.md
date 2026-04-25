@@ -84,6 +84,35 @@ lib/
 supabase/migrations/0001_init.sql
 ```
 
+## Storybook
+
+Visual regression / component sandbox for `Lobby`, `Standings`,
+`RevealStage`, and the UI primitives. Stories live next to their
+components as `*.stories.tsx`.
+
+```sh
+pnpm storybook        # runs at http://localhost:6006
+pnpm build-storybook  # static build → storybook-static/
+```
+
+## Chromatic
+
+Chromatic runs visual snapshots of every story on each push / PR. To
+finish setup once:
+
+1. Sign in at [chromatic.com](https://www.chromatic.com) and create a
+   new project linked to this GitHub repo.
+2. Copy the project token Chromatic gives you.
+3. Add it as a GitHub secret named `CHROMATIC_PROJECT_TOKEN` (Settings
+   → Secrets and variables → Actions).
+
+The workflow at [.github/workflows/chromatic.yml](.github/workflows/chromatic.yml)
+will then run on every push to `main` and every PR. To publish locally:
+
+```sh
+CHROMATIC_PROJECT_TOKEN=… pnpm chromatic
+```
+
 ## Future ideas
 
 - More themes: birthdays, wedding showers, holidays. Each is just a starter question pack + alias dict.
