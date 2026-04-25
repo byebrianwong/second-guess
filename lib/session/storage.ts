@@ -40,6 +40,12 @@ export function savePlayerSession(code: string, session: PlayerSession) {
   writeMap(PLAYERS_KEY, map);
 }
 
+export function clearPlayerSession(code: string) {
+  const map = readMap<PlayerSession>(PLAYERS_KEY);
+  delete map[code.toUpperCase()];
+  writeMap(PLAYERS_KEY, map);
+}
+
 export function getHostSecret(code: string): string | null {
   const map = readMap<string>(HOSTS_KEY);
   return map[code.toUpperCase()] ?? null;

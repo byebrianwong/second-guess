@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,6 +9,7 @@ import { Button, Card, Logo, Pill } from "@/app/_components/ui";
 import { Lobby } from "@/app/_components/Lobby";
 import { Reactions } from "@/app/_components/Reactions";
 import { RevealStage } from "@/app/_components/RevealStage";
+import { Standings } from "@/app/_components/Standings";
 import { useGameChannel } from "@/lib/supabase/realtime";
 import { getSupabase } from "@/lib/supabase/client";
 import { groupAnswers } from "@/lib/scoring/normalize";
@@ -19,8 +20,17 @@ import {
   nextQuestion,
   mergeAnswerGroups,
   unmergeAnswerGroup,
+  resetGameToLobby,
+  cancelGame,
+  removePlayer,
 } from "@/lib/actions";
 import { getHostSecret } from "@/lib/session/storage";
+import {
+  addBot,
+  botAnswerNow,
+  getBots,
+  removeAllBots,
+} from "@/lib/dev/bots";
 import type { Game } from "@/lib/types";
 
 export default function HostGamePage({
@@ -117,26 +127,42 @@ export default function HostGamePage({
 
   return (
     <main className="flex-1 px-4 sm:px-6 py-6 max-w-3xl mx-auto w-full pb-32">
-      <header className="flex items-center justify-between mb-4">
-        <Logo />
-        <div className="flex items-center gap-2">
+      <header className="flex items-center justify-between mb-4 gap-2">
+        <Logo compact={game.status === "active"} />
+        <div className="flex items-center gap-2 min-w-0">
+          {game.status === "active" && <CompactShare code={code} />}
           <Pill tone="lavender">HOST</Pill>
         </div>
       </header>
 
-      <Card className="mb-6 text-center">
-        <p className="text-xs uppercase tracking-widest text-ink-soft mb-1">
-          Room code
-        </p>
-        <p className="font-display text-6xl font-bold tracking-[0.3em] text-blush-deep">
-          {code}
-        </p>
-        <ShareInvite code={code} />
-      </Card>
+      {game.status !== "active" && (
+        <Card className="mb-6 text-center">
+          <p className="text-xs uppercase tracking-widest text-ink-soft mb-1">
+            Room code
+          </p>
+          <p className="font-display text-6xl font-bold tracking-[0.3em] text-blush-deep">
+            {code}
+          </p>
+          <ShareInvite code={code} />
+        </Card>
+      )}
+
+      <BotPanel
+        gameId={game.id}
+        code={code}
+        currentQuestion={currentQuestion}
+      />
 
       {game.status === "lobby" && (
         <>
-          <Lobby players={snapshot.players} />
+          <Lobby
+            players={snapshot.players}
+            onRemove={(p) => {
+              if (window.confirm(`Remove ${p.name} from this game?`)) {
+                removePlayer(p.id);
+              }
+            }}
+          />
           <div className="mt-8 flex flex-col items-center gap-2">
             <Button
               size="lg"
@@ -149,6 +175,7 @@ export default function HostGamePage({
               {totalQuestions} {totalQuestions === 1 ? "question" : "questions"} ready
             </p>
           </div>
+          <CancelGameButton gameId={game.id} className="mt-10" />
         </>
       )}
 
@@ -237,9 +264,23 @@ export default function HostGamePage({
 
           <Standings
             players={snapshot.players}
-            totals={totals}
+            scores={snapshot.scores}
+            currentQuestionId={currentQuestion.id}
+            showMovement={currentQuestion.state === "revealed"}
             className="mt-10"
           />
+
+          <Card className="mt-12 text-center">
+            <p className="text-xs uppercase tracking-widest text-ink-soft mb-1">
+              Room code
+            </p>
+            <p className="font-display text-5xl font-bold tracking-[0.3em] text-blush-deep">
+              {code}
+            </p>
+            <ShareInvite code={code} />
+          </Card>
+
+          <EndGameButton gameId={game.id} className="mt-6" />
         </>
       )}
 
@@ -334,6 +375,234 @@ function ShareInvite({ code }: { code: string }) {
         Send this link, or have players type{" "}
         <span className="font-bold text-ink">{code}</span> on the home page.
       </p>
+    </div>
+  );
+}
+
+function CompactShare({ code }: { code: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const [url, setUrl] = useState("");
+
+  useEffect(() => {
+    setUrl(`${window.location.origin}/play/${code}`);
+  }, [code]);
+
+  async function onClick() {
+    if (await tryCopy(url)) {
+      setState("copied");
+    } else {
+      setState("failed");
+    }
+    setTimeout(() => setState("idle"), 1800);
+  }
+
+  const label =
+    state === "copied"
+      ? "Copied!"
+      : state === "failed"
+        ? "Couldn't copy"
+        : code;
+
+  return (
+    <button
+      onClick={onClick}
+      className={`h-9 px-3 rounded-pill flex items-center gap-1.5 text-sm font-bold tracking-widest transition active:scale-95 ${
+        state === "copied"
+          ? "bg-mint text-emerald-900"
+          : state === "failed"
+            ? "bg-red-100 text-red-700"
+            : "bg-cream-deep/70 text-ink hover:bg-cream-deep"
+      }`}
+      aria-label={`Copy invite link for ${code}`}
+    >
+      {state === "copied" ? <Check size={14} /> : <Copy size={14} />}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function CancelGameButton({
+  gameId,
+  className,
+}: {
+  gameId: string;
+  className?: string;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  async function onClick() {
+    if (
+      !window.confirm(
+        "Cancel this game? The room will be closed and you'll go back to host setup.",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await cancelGame(gameId);
+      router.push("/host/new");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className={`flex justify-center ${className ?? ""}`}>
+      <button
+        onClick={onClick}
+        disabled={busy}
+        className="text-xs text-ink-soft underline underline-offset-4 hover:text-red-500 transition disabled:opacity-40"
+      >
+        {busy ? "Canceling…" : "Cancel this game"}
+      </button>
+    </div>
+  );
+}
+
+function EndGameButton({
+  gameId,
+  className,
+}: {
+  gameId: string;
+  className?: string;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  async function onClick() {
+    if (
+      !window.confirm(
+        "End this game and send everyone back to the lobby? All answers and scores from this game will be cleared.",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await resetGameToLobby(gameId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className={`flex justify-center ${className ?? ""}`}>
+      <button
+        onClick={onClick}
+        disabled={busy}
+        className="text-xs text-ink-soft underline underline-offset-4 hover:text-red-500 transition disabled:opacity-40"
+      >
+        {busy ? "Ending…" : "End game & return to lobby"}
+      </button>
+    </div>
+  );
+}
+
+function BotPanel({
+  gameId,
+  code,
+  currentQuestion,
+}: {
+  gameId: string;
+  code: string;
+  currentQuestion: {
+    id: string;
+    state: string;
+  } | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [bots, setBots] = useState<ReturnType<typeof getBots>>([]);
+  const [busy, setBusy] = useState(false);
+  const answeredRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    setBots(getBots(code));
+  }, [code]);
+
+  // Auto-answer for bots whenever a question is in 'open' state.
+  useEffect(() => {
+    if (!currentQuestion || currentQuestion.state !== "open") return;
+    const qid = currentQuestion.id;
+    const fresh = getBots(code);
+    if (fresh.length === 0) return;
+
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    for (const bot of fresh) {
+      const key = `${qid}:${bot.id}`;
+      if (answeredRef.current.has(key)) continue;
+      answeredRef.current.add(key);
+      const delay = 400 + Math.random() * 2600;
+      const t = setTimeout(() => {
+        botAnswerNow({ questionId: qid, bot });
+      }, delay);
+      timeouts.push(t);
+    }
+    return () => {
+      for (const t of timeouts) clearTimeout(t);
+    };
+  }, [currentQuestion?.id, currentQuestion?.state, code]);
+
+  async function add(n: number) {
+    setBusy(true);
+    try {
+      for (let i = 0; i < n; i++) {
+        await addBot({ gameId, code });
+      }
+      setBots(getBots(code));
+    } catch {
+      // ignore
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function clearAll() {
+    if (!window.confirm(`Forget all ${bots.length} bots locally? They'll stay in the lobby on screen until the game ends.`)) {
+      return;
+    }
+    removeAllBots(code);
+    setBots([]);
+    answeredRef.current = new Set();
+  }
+
+  return (
+    <div className="mb-6">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="text-xs text-ink-soft hover:text-ink underline underline-offset-4"
+      >
+        🤖 Test bots {bots.length > 0 ? `(${bots.length})` : ""} {open ? "▾" : "▸"}
+      </button>
+      {open && (
+        <div className="mt-2 bg-cream-deep/40 p-3 rounded-card space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="soft" size="sm" disabled={busy} onClick={() => add(1)} type="button">
+              +1
+            </Button>
+            <Button variant="soft" size="sm" disabled={busy} onClick={() => add(3)} type="button">
+              +3
+            </Button>
+            <Button variant="soft" size="sm" disabled={busy} onClick={() => add(8)} type="button">
+              +8
+            </Button>
+            {bots.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAll}
+                type="button"
+                className="ml-auto"
+              >
+                Forget all
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-ink-soft">
+            Bots auto-answer each question with random picks. Useful for testing alone.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -465,37 +734,6 @@ function hasMergedKeys(g: ReturnType<typeof groupAnswers>[number]): boolean {
   // If this group has more than one underlying raw text variant, treat as mergeable/splittable.
   const distinct = new Set(g.rawAnswers.map((r) => r.rawText.toLowerCase()));
   return distinct.size > 1;
-}
-
-function Standings({
-  players,
-  totals,
-  className,
-}: {
-  players: { id: string; name: string; avatar: string }[];
-  totals: Map<string, number>;
-  className?: string;
-}) {
-  const sorted = [...players].sort(
-    (a, b) => (totals.get(b.id) ?? 0) - (totals.get(a.id) ?? 0),
-  );
-  return (
-    <Card className={className}>
-      <h3 className="font-display text-lg font-bold mb-3">Standings</h3>
-      <ul className="space-y-1.5">
-        {sorted.map((p, i) => (
-          <li key={p.id} className="flex items-center gap-3 text-sm">
-            <span className="w-5 text-right text-ink-soft">{i + 1}.</span>
-            <span className="text-xl">{p.avatar}</span>
-            <span className="flex-1 font-semibold truncate">{p.name}</span>
-            <span className="font-display font-bold">
-              {totals.get(p.id) ?? 0}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
 }
 
 function FinalLeaderboard({

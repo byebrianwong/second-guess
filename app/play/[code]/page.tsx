@@ -7,6 +7,8 @@ import { Button, Card, Input, Logo, Pill } from "@/app/_components/ui";
 import { Lobby } from "@/app/_components/Lobby";
 import { Reactions } from "@/app/_components/Reactions";
 import { RevealStage } from "@/app/_components/RevealStage";
+import { Standings } from "@/app/_components/Standings";
+import { useRouter } from "next/navigation";
 import { useGameChannel } from "@/lib/supabase/realtime";
 import { groupAnswers } from "@/lib/scoring/normalize";
 import {
@@ -14,10 +16,12 @@ import {
   joinGame,
   submitAnswer,
   touchPlayer,
+  removePlayer,
 } from "@/lib/actions";
 import {
   getPlayerSession,
   savePlayerSession,
+  clearPlayerSession,
   hasSeenReveal,
   markRevealSeen,
 } from "@/lib/session/storage";
@@ -195,7 +199,18 @@ function PlayInGame({
   gameId: string;
   playerId: string;
 }) {
+  const router = useRouter();
   const { snapshot } = useGameChannel(gameId);
+
+  // Detect host-side removal: once the snapshot has loaded players and our id
+  // is not among them, drop our session and head home.
+  useEffect(() => {
+    if (snapshot.players.length === 0) return;
+    if (snapshot.players.some((p) => p.id === playerId)) return;
+    clearPlayerSession(code);
+    window.alert("The host removed you from the game.");
+    router.push("/");
+  }, [snapshot.players, playerId, code, router]);
 
   const currentQuestion = useMemo(() => {
     if (!snapshot.game) return null;
@@ -262,6 +277,23 @@ function PlayInGame({
             </motion.div>
           </Card>
           <Lobby players={snapshot.players} selfId={playerId} />
+          <div className="mt-8 flex justify-center">
+            <button
+              onClick={async () => {
+                if (!window.confirm("Leave this game? You'll lose your spot.")) return;
+                try {
+                  await removePlayer(playerId);
+                } catch {
+                  // ignore
+                }
+                clearPlayerSession(code);
+                router.push("/");
+              }}
+              className="text-xs text-ink-soft underline underline-offset-4 hover:text-red-500 transition"
+            >
+              Leave the game
+            </button>
+          </div>
         </>
       )}
 
@@ -294,21 +326,28 @@ function PlayInGame({
           )}
 
           {currentQuestion.state === "reviewing" && (
-            <WaitCard
-              title="Tallying it up"
-              subtitle="Host is grouping similar answers…"
-              emoji="🧐"
-            />
+            <WaitCard title="Tallying it up" emoji="🧐" />
           )}
 
           {currentQuestion.state === "revealed" && (
-            <RevealWithMemory
-              questionId={currentQuestion.id}
-              prompt={currentQuestion.prompt}
-              groups={groupAnswers(currentAnswers)}
-              scores={currentScores}
-              selfId={playerId}
-            />
+            <>
+              <RevealWithMemory
+                questionId={currentQuestion.id}
+                prompt={currentQuestion.prompt}
+                groups={groupAnswers(currentAnswers)}
+                scores={currentScores}
+                selfId={playerId}
+              />
+              <Standings
+                players={snapshot.players}
+                scores={snapshot.scores}
+                currentQuestionId={currentQuestion.id}
+                showMovement
+                selfId={playerId}
+                className="mt-6"
+                title="Leaderboard"
+              />
+            </>
           )}
         </>
       )}
@@ -409,7 +448,7 @@ function WaitCard({
   emoji,
 }: {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   emoji: string;
 }) {
   return (
@@ -422,7 +461,7 @@ function WaitCard({
         {emoji}
       </motion.div>
       <p className="font-display text-2xl font-bold mb-1">{title}</p>
-      <p className="text-ink-soft">{subtitle}</p>
+      {subtitle && <p className="text-ink-soft">{subtitle}</p>}
     </Card>
   );
 }

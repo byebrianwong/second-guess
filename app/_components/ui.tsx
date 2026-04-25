@@ -93,13 +93,26 @@ export function Pill({
   );
 }
 
-export function Logo({ className }: { className?: string }) {
+export function Logo({
+  className,
+  compact = false,
+}: {
+  className?: string;
+  compact?: boolean;
+}) {
   return (
-    <div className={cn("flex items-center gap-2 font-display", className)}>
+    <div
+      className={cn(
+        "flex items-center gap-2 font-display whitespace-nowrap",
+        className,
+      )}
+    >
       <span className="text-3xl">🤔</span>
-      <span className="text-2xl font-bold tracking-tight">
-        Second <span className="italic text-blush-deep">Guess</span>
-      </span>
+      {!compact && (
+        <span className="text-2xl font-bold tracking-tight">
+          Second <span className="italic text-blush-deep">Guess</span>
+        </span>
+      )}
     </div>
   );
 }

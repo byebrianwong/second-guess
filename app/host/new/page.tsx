@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import { GripVertical } from "lucide-react";
-import { Button, Card, Input, Logo, Pill } from "@/app/_components/ui";
+import { Button, Card, Logo, Pill } from "@/app/_components/ui";
 import { createGame } from "@/lib/actions";
 import { saveHostSecret } from "@/lib/session/storage";
 import { BABY_SHOWER_QUESTIONS } from "@/lib/data/baby-shower-questions";
@@ -168,7 +168,7 @@ function QuestionRow({
       value={item}
       dragListener={false}
       dragControls={controls}
-      className="flex items-center gap-2 bg-white"
+      className="flex items-start gap-2 bg-white"
       whileDrag={{
         scale: 1.02,
         boxShadow: "0 12px 40px -16px rgba(42,36,56,0.4)",
@@ -178,23 +178,24 @@ function QuestionRow({
       <button
         type="button"
         onPointerDown={(e) => controls.start(e)}
-        className="touch-none cursor-grab active:cursor-grabbing text-ink-faint hover:text-ink-soft p-1 -ml-1 shrink-0"
+        className="touch-none cursor-grab active:cursor-grabbing text-ink-faint hover:text-ink-soft p-1 -ml-1 shrink-0 mt-2.5"
         aria-label="Drag to reorder"
       >
         <GripVertical size={18} />
       </button>
-      <span className="text-ink-faint w-6 text-right shrink-0 tabular-nums">
+      <span className="text-ink-faint w-6 text-right shrink-0 tabular-nums mt-2.5">
         {index + 1}.
       </span>
-      <Input
+      <textarea
         value={item.text}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Name a..."
-        className="flex-1"
+        rows={1}
+        className="flex-1 min-w-0 px-4 py-2.5 rounded-2xl bg-white border border-ink-faint/40 text-ink placeholder:text-ink-faint focus:outline-none focus:border-blush-deep focus:ring-4 focus:ring-blush/40 transition resize-none leading-snug [field-sizing:content]"
       />
       <button
         onClick={onRemove}
-        className="w-9 h-9 rounded-full hover:bg-blush/40 text-ink-soft text-lg shrink-0"
+        className="w-9 h-9 rounded-full hover:bg-blush/40 text-ink-soft text-lg shrink-0 mt-1"
         aria-label="Remove question"
         type="button"
       >

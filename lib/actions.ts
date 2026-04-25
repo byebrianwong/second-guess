@@ -6,12 +6,36 @@ import type { Game, Question, Player } from "./types";
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ"; // no I/O/L
 
-function randomCode(): string {
-  let s = "";
-  for (let i = 0; i < 4; i++) {
-    s += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+// FNV-1a 32-bit hashes of 4-letter codes we don't want to display as room
+// codes (slurs, slang, harassment terms). Stored as opaque hashes so the
+// words themselves never appear in source. To add a new entry, hash with:
+//   node -e "let h=0x811c9dc5;for(const c of 'WORD')h=Math.imul(h^c.charCodeAt(0),0x01000193);console.log((h>>>0).toString(16).padStart(8,'0'))"
+const BLOCKED_HASHES = new Set([
+  "e3c91d8a", "d07fb3be", "03dcd7a2", "0bdce43a", "fcdccc9d", "03fd2b4d",
+  "6a3e6c09", "723e78a1", "ba8c7eff", "ad334ad7", "67a292a9", "85ad30de",
+  "0a3b48f1", "6059d38a", "4ccc8efc", "453785ff", "a6bc44be", "1b2a33f3",
+  "c0306419", "8746039d", "8e124ab9", "a6127081", "a5126eee", "9d126256",
+  "164407f5", "c6403122", "63a9efd6", "bbe01333",
+]);
+
+function fnv1aHex(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
   }
-  return s;
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+function randomCode(): string {
+  // tiny probability of a blocked hit; loop until clean.
+  while (true) {
+    let s = "";
+    for (let i = 0; i < 4; i++) {
+      s += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+    }
+    if (!BLOCKED_HASHES.has(fnv1aHex(s))) return s;
+  }
 }
 
 export async function createGame(opts: {
@@ -59,11 +83,14 @@ export async function createGame(opts: {
 
 export async function getGameByCode(code: string): Promise<Game | null> {
   const supabase = getSupabase();
+  // Prefer a non-finished game with this code. Fall back to the most recent
+  // finished game so players refreshing on the final leaderboard keep their
+  // view until the host explicitly cancels and a new game claims the code.
   const { data } = await supabase
     .from("games")
     .select("*")
     .eq("code", code.toUpperCase())
-    .neq("status", "finished")
+    .order("ended_at", { ascending: false, nullsFirst: true })
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -98,6 +125,11 @@ export async function joinGame(opts: {
     throw new Error(error.message);
   }
   return data as Player;
+}
+
+export async function removePlayer(playerId: string) {
+  const supabase = getSupabase();
+  await supabase.from("players").delete().eq("id", playerId);
 }
 
 export async function touchPlayer(playerId: string) {
@@ -171,11 +203,34 @@ export async function unmergeAnswerGroup(opts: {
   groupKey: string;
 }) {
   const supabase = getSupabase();
-  await supabase
+  // Fetch every answer that is currently in this group, whether they were
+  // manually merged (group_key = opts.groupKey) or auto-grouped purely by
+  // normalization (group_key IS NULL and normalized = opts.groupKey).
+  const { data: answers } = await supabase
     .from("answers")
-    .update({ group_key: null })
-    .eq("question_id", opts.questionId)
-    .eq("group_key", opts.groupKey);
+    .select("id, raw_text, group_key, normalized")
+    .eq("question_id", opts.questionId);
+
+  const targets = (answers ?? []).filter(
+    (a: { group_key: string | null; normalized: string }) =>
+      a.group_key === opts.groupKey ||
+      (a.group_key === null && a.normalized === opts.groupKey),
+  ) as { id: string; raw_text: string }[];
+
+  if (targets.length === 0) return;
+
+  // Give each answer a per-raw-text key so identical raw texts stay together
+  // ("Lego" + "Lego" → one group) but variants split apart ("Lego" vs
+  // "Legos" → two groups). The "raw:" prefix avoids colliding with any
+  // normalized key.
+  await Promise.all(
+    targets.map((a) =>
+      supabase
+        .from("answers")
+        .update({ group_key: `raw:${a.raw_text.trim().toLowerCase()}` })
+        .eq("id", a.id),
+    ),
+  );
 }
 
 export async function revealQuestion(questionId: string) {
@@ -184,6 +239,35 @@ export async function revealQuestion(questionId: string) {
     p_question_id: questionId,
   });
   if (error) throw new Error(error.message);
+}
+
+export async function cancelGame(gameId: string) {
+  const supabase = getSupabase();
+  await supabase
+    .from("games")
+    .update({ status: "finished", ended_at: new Date().toISOString() })
+    .eq("id", gameId);
+}
+
+export async function resetGameToLobby(gameId: string) {
+  const supabase = getSupabase();
+  const { data: questions } = await supabase
+    .from("questions")
+    .select("id")
+    .eq("game_id", gameId);
+  const qIds = (questions ?? []).map((q: { id: string }) => q.id);
+  if (qIds.length > 0) {
+    await supabase.from("round_scores").delete().in("question_id", qIds);
+    await supabase.from("answers").delete().in("question_id", qIds);
+    await supabase
+      .from("questions")
+      .update({ state: "pending", opened_at: null, closed_at: null })
+      .eq("game_id", gameId);
+  }
+  await supabase
+    .from("games")
+    .update({ status: "lobby", current_round: 0, ended_at: null })
+    .eq("id", gameId);
 }
 
 export async function nextQuestion(opts: {
