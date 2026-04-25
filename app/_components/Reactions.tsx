@@ -24,21 +24,25 @@ export function Reactions({
   const channelRef = useRef<RealtimeChannel | null>(null);
   const lastSent = useRef(0);
 
+  function spawnFloat(emoji: string) {
+    const f: Float = {
+      id: `${Date.now()}-${Math.random()}`,
+      emoji,
+      x: 10 + Math.random() * 80,
+    };
+    setFloats((arr) => [...arr, f]);
+    setTimeout(() => {
+      setFloats((arr) => arr.filter((x) => x.id !== f.id));
+    }, 1700);
+  }
+
   useEffect(() => {
     if (!gameId) return;
     const supabase = getSupabase();
     const channel = supabase
       .channel(`reactions:${gameId}`)
       .on("broadcast", { event: "reaction" }, ({ payload }) => {
-        const f: Float = {
-          id: `${Date.now()}-${Math.random()}`,
-          emoji: (payload as { emoji: string }).emoji,
-          x: 10 + Math.random() * 80,
-        };
-        setFloats((arr) => [...arr, f]);
-        setTimeout(() => {
-          setFloats((arr) => arr.filter((x) => x.id !== f.id));
-        }, 1700);
+        spawnFloat((payload as { emoji: string }).emoji);
       })
       .subscribe();
     channelRef.current = channel;
@@ -46,6 +50,7 @@ export function Reactions({
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
 
   function send(emoji: string) {
@@ -54,6 +59,7 @@ export function Reactions({
     const now = Date.now();
     if (now - lastSent.current < 700) return;
     lastSent.current = now;
+    spawnFloat(emoji);
     channel.send({ type: "broadcast", event: "reaction", payload: { emoji } });
   }
 

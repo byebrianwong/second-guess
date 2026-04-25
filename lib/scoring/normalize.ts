@@ -80,3 +80,23 @@ export function pointsForRank(rank: number): number {
   if (rank === 4) return 1;
   return 0;
 }
+
+/**
+ * Assign tie-aware ranks to a list of groups already sorted by count descending.
+ * Tied counts share a rank; the next distinct count skips ahead.
+ *   counts [5, 5, 3, 2, 1] -> ranks [1, 1, 3, 4, 5]
+ *   counts [4, 4, 4, 1]    -> ranks [1, 1, 1, 4]
+ */
+export function computeRanks<T extends { count: number }>(
+  groups: T[],
+): Array<T & { rank: number }> {
+  let rank = 0;
+  let prevCount: number | null = null;
+  return groups.map((g, i) => {
+    if (prevCount === null || g.count !== prevCount) {
+      rank = i + 1;
+      prevCount = g.count;
+    }
+    return { ...g, rank };
+  });
+}

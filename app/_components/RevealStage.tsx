@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { AnswerGroup, RoundScore } from "@/lib/types";
-import { pointsForRank } from "@/lib/scoring/normalize";
+import { pointsForRank, computeRanks } from "@/lib/scoring/normalize";
 import { Pill } from "./ui";
 
 interface RevealRow {
@@ -44,10 +44,10 @@ export function RevealStage({
   const max = Math.max(1, ...top.map((g) => g.count));
   const total = scores.length;
 
-  const rows: RevealRow[] = top.map((g, i) => ({
-    rank: i + 1,
+  const rows: RevealRow[] = computeRanks(top).map((g) => ({
+    rank: g.rank,
     group: g,
-    points: pointsForRank(i + 1),
+    points: pointsForRank(g.rank),
   }));
 
   const [phase, setPhase] = useState<"tabulating" | "revealing" | "done">(
@@ -66,17 +66,31 @@ export function RevealStage({
   useEffect(() => {
     if (phase !== "revealing") return;
     const order = [...rows].reverse(); // reveal #5 -> #4 -> ... -> #1
+    if (order.length === 0) {
+      setPhase("done");
+      return;
+    }
+    let cancelled = false;
     let i = 0;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
     const tick = () => {
+      if (cancelled) return;
       if (i >= order.length) {
         setPhase("done");
         return;
       }
-      setRevealedRanks((r) => [...r, order[i].rank]);
+      const rank = order[i].rank;
+      setRevealedRanks((r) => [...r, rank]);
       i += 1;
-      setTimeout(tick, 900);
+      timeoutId = setTimeout(tick, 900);
     };
     tick();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== null) clearTimeout(timeoutId);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
@@ -89,7 +103,7 @@ export function RevealStage({
     return null;
   })();
   const selfRank = selfAnswerGroup
-    ? top.findIndex((g) => g.key === selfAnswerGroup.key) + 1
+    ? (rows.find((r) => r.group.key === selfAnswerGroup.key)?.rank ?? 0)
     : 0;
 
   return (

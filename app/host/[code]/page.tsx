@@ -2,7 +2,9 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { Check, Copy, Share2 } from "lucide-react";
 import { Button, Card, Logo, Pill } from "@/app/_components/ui";
 import { Lobby } from "@/app/_components/Lobby";
 import { Reactions } from "@/app/_components/Reactions";
@@ -129,9 +131,7 @@ export default function HostGamePage({
         <p className="font-display text-6xl font-bold tracking-[0.3em] text-blush-deep">
           {code}
         </p>
-        <p className="text-ink-soft text-sm mt-2">
-          Players go to <span className="font-semibold text-ink">this site</span> and enter this code.
-        </p>
+        <ShareInvite code={code} />
       </Card>
 
       {game.status === "lobby" && (
@@ -249,6 +249,92 @@ export default function HostGamePage({
 
       <Reactions gameId={gameId} />
     </main>
+  );
+}
+
+function ShareInvite({ code }: { code: string }) {
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
+  const [url, setUrl] = useState("");
+
+  useEffect(() => {
+    setUrl(`${window.location.origin}/play/${code}`);
+  }, [code]);
+
+  const canNativeShare =
+    typeof window !== "undefined" &&
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function";
+
+  async function copy() {
+    if (await tryCopy(url)) {
+      setCopyState("copied");
+    } else {
+      setCopyState("failed");
+    }
+    setTimeout(() => setCopyState("idle"), 2000);
+  }
+
+  async function nativeShare() {
+    try {
+      await navigator.share({
+        title: "Second Guess",
+        text: `Join my Second Guess game — code ${code}`,
+        url,
+      });
+    } catch {
+      // user cancelled, ignore
+    }
+  }
+
+  return (
+    <div className="mt-4 flex flex-col items-center gap-2">
+      <div className="flex items-center gap-2 w-full max-w-md">
+        <input
+          readOnly
+          value={url}
+          onFocus={(e) => e.currentTarget.select()}
+          onClick={(e) => e.currentTarget.select()}
+          className="flex-1 px-4 py-2.5 rounded-pill bg-cream-deep/60 text-sm text-ink-soft text-left font-mono w-0 border-none focus:outline-none focus:ring-2 focus:ring-blush-deep/40"
+        />
+        <button
+          onClick={copy}
+          className={`h-10 px-4 rounded-pill font-semibold text-sm flex items-center gap-1.5 transition active:scale-95 ${
+            copyState === "copied"
+              ? "bg-mint text-emerald-900"
+              : copyState === "failed"
+                ? "bg-red-100 text-red-700"
+                : "bg-blush-deep text-white hover:bg-blush-deep/90"
+          }`}
+          aria-label="Copy invite link"
+        >
+          {copyState === "copied" ? (
+            <Check size={16} />
+          ) : (
+            <Copy size={16} />
+          )}
+          {copyState === "copied"
+            ? "Copied"
+            : copyState === "failed"
+              ? "Select & copy"
+              : "Copy link"}
+        </button>
+        {canNativeShare && (
+          <button
+            onClick={nativeShare}
+            className="h-10 px-3 rounded-pill bg-white border border-ink-faint/40 text-ink-soft hover:border-blush-deep transition active:scale-95"
+            aria-label="Share invite"
+          >
+            <Share2 size={16} />
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-ink-soft">
+        Send this link, or have players type{" "}
+        <span className="font-bold text-ink">{code}</span> on the home page.
+      </p>
+    </div>
   );
 }
 
@@ -419,10 +505,22 @@ function FinalLeaderboard({
   players: { id: string; name: string; avatar: string }[];
   totals: Map<string, number>;
 }) {
+  const router = useRouter();
   const sorted = [...players].sort(
     (a, b) => (totals.get(b.id) ?? 0) - (totals.get(a.id) ?? 0),
   );
   const winner = sorted[0];
+
+  function startNewGame() {
+    if (
+      window.confirm(
+        "Start a brand new game? This room will be left behind and you'll get a new code.",
+      )
+    ) {
+      router.push("/host/new");
+    }
+  }
+
   return (
     <div className="text-center">
       <motion.div
@@ -460,6 +558,45 @@ function FinalLeaderboard({
           ))}
         </ol>
       </Card>
+
+      <button
+        onClick={startNewGame}
+        className="mt-6 text-xs text-ink-soft underline underline-offset-4 hover:text-ink transition"
+      >
+        Start a new game
+      </button>
     </div>
   );
+}
+
+async function tryCopy(text: string): Promise<boolean> {
+  try {
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.clipboard &&
+      window.isSecureContext
+    ) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fall through to legacy path
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "0";
+    ta.style.left = "0";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
 }
