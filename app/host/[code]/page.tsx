@@ -25,6 +25,7 @@ import {
   removePlayer,
 } from "@/lib/actions";
 import { getHostSecret } from "@/lib/session/storage";
+import { joinNames, tieRanks } from "@/lib/utils";
 import {
   addBot,
   botAnswerNow,
@@ -747,7 +748,11 @@ function FinalLeaderboard({
   const sorted = [...players].sort(
     (a, b) => (totals.get(b.id) ?? 0) - (totals.get(a.id) ?? 0),
   );
-  const winner = sorted[0];
+  const ranks = tieRanks(sorted, (p) => totals.get(p.id) ?? 0);
+  const topScore = sorted.length > 0 ? totals.get(sorted[0].id) ?? 0 : 0;
+  const winners = sorted.filter((p) => (totals.get(p.id) ?? 0) === topScore);
+  const winnerNames = joinNames(winners.map((w) => w.name));
+  const verb = winners.length > 1 ? "win" : "wins";
 
   function startNewGame() {
     if (
@@ -770,10 +775,10 @@ function FinalLeaderboard({
         🏆
       </motion.div>
       <h1 className="font-display text-4xl font-bold mb-2">
-        {winner ? winner.name : "Game over"}!
+        {winners.length > 0 ? `${winnerNames} ${verb}!` : "Game over!"}
       </h1>
       <p className="text-ink-soft mb-6">
-        {winner ? `${totals.get(winner.id) ?? 0} points` : ""}
+        {winners.length > 0 ? `${topScore} points` : ""}
       </p>
       <Card>
         <ol className="space-y-2 text-left">
@@ -781,11 +786,11 @@ function FinalLeaderboard({
             <li
               key={p.id}
               className={`flex items-center gap-3 p-2 rounded-pill ${
-                i === 0 ? "bg-lemon" : ""
+                ranks[i] === 1 ? "bg-lemon" : ""
               }`}
             >
               <span className="w-6 text-right font-display font-bold">
-                {i + 1}
+                {ranks[i]}
               </span>
               <span className="text-2xl">{p.avatar}</span>
               <span className="flex-1 font-semibold truncate">{p.name}</span>
