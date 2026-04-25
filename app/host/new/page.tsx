@@ -87,33 +87,19 @@ export default function HostNewPage() {
       <Card className="mb-6">
         <h1 className="font-display text-2xl font-bold mb-1">Build your game</h1>
         <p className="text-ink-soft text-sm mb-4">
-          Pick a theme, edit the question list. Players join with a 4-letter code.
+          Edit the question list. Players join with a 4-letter code.
         </p>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold mb-1">Theme</label>
-            <select
-              value={theme}
-              onChange={(e) => setTheme(e.target.value)}
-              className="h-12 px-4 rounded-pill bg-white border border-ink-faint/40 w-full"
-            >
-              <option value="baby_shower">🍼 Baby shower</option>
-              <option value="general">🎉 General party</option>
-            </select>
-          </div>
-
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="soft" size="sm" onClick={loadStarter} type="button">
-              Load 10 baby-shower starters
-            </Button>
-            <Button variant="ghost" size="sm" onClick={shuffle} type="button">
-              🎲 Shuffle
-            </Button>
-            <Button variant="ghost" size="sm" onClick={addPrompt} type="button">
-              + Add question
-            </Button>
-          </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="soft" size="sm" onClick={loadStarter} type="button">
+            Load 10 baby-shower starters
+          </Button>
+          <Button variant="ghost" size="sm" onClick={shuffle} type="button">
+            🎲 Shuffle
+          </Button>
+          <Button variant="ghost" size="sm" onClick={addPrompt} type="button">
+            + Add question
+          </Button>
         </div>
       </Card>
 
