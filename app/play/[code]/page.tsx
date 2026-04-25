@@ -26,6 +26,7 @@ import {
   markRevealSeen,
 } from "@/lib/session/storage";
 import { AVATAR_EMOJI } from "@/lib/avatars";
+import { joinNames, tieRanks } from "@/lib/utils";
 import type { Game } from "@/lib/types";
 
 export default function PlayPage({
@@ -506,8 +507,16 @@ function FinalLeaderboard({
   const sorted = [...players].sort(
     (a, b) => (totals.get(b.id) ?? 0) - (totals.get(a.id) ?? 0),
   );
-  const winner = sorted[0];
-  const youRank = sorted.findIndex((p) => p.id === selfId) + 1;
+  const ranks = tieRanks(sorted, (p) => totals.get(p.id) ?? 0);
+  const topScore = sorted.length > 0 ? totals.get(sorted[0].id) ?? 0 : 0;
+  const winners = sorted.filter((p) => (totals.get(p.id) ?? 0) === topScore);
+  const winnerNames = joinNames(winners.map((w) => w.name));
+  const verb = winners.length > 1 ? "win" : "wins";
+  const youRank = (() => {
+    const idx = sorted.findIndex((p) => p.id === selfId);
+    return idx >= 0 ? ranks[idx] : 0;
+  })();
+  const iWon = winners.some((w) => w.id === selfId);
   return (
     <div className="text-center">
       <motion.div
@@ -519,11 +528,13 @@ function FinalLeaderboard({
         🏆
       </motion.div>
       <h1 className="font-display text-4xl font-bold mb-1">
-        {winner ? `${winner.name} wins!` : "Game over"}
+        {winners.length > 0 ? `${winnerNames} ${verb}!` : "Game over"}
       </h1>
       {youRank > 0 && (
         <p className="text-ink-soft mb-6">
-          You came in #{youRank} with {totals.get(selfId) ?? 0} points
+          {iWon
+            ? `You won with ${totals.get(selfId) ?? 0} points!`
+            : `You came in #${youRank} with ${totals.get(selfId) ?? 0} points`}
         </p>
       )}
       <Card>
@@ -532,11 +543,11 @@ function FinalLeaderboard({
             <li
               key={p.id}
               className={`flex items-center gap-3 p-2 rounded-pill ${
-                i === 0 ? "bg-lemon" : ""
+                ranks[i] === 1 ? "bg-lemon" : ""
               } ${p.id === selfId ? "ring-2 ring-blush-deep" : ""}`}
             >
               <span className="w-6 text-right font-display font-bold">
-                {i + 1}
+                {ranks[i]}
               </span>
               <span className="text-2xl">{p.avatar}</span>
               <span className="flex-1 font-semibold truncate">{p.name}</span>
