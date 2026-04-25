@@ -1,0 +1,13 @@
+/*
+ * In the Next.js app, fonts come from `next/font` which auto-assigns
+ * CSS custom properties (--font-nunito, --font-fraunces). Storybook
+ * runs outside Next so we approximate the same setup by pulling the
+ * fonts from Google Fonts and pointing the same vars at them. Theme
+ * tokens in app/globals.css then resolve correctly.
+ */
+@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Fraunces:wght@500;700;900&display=swap");
+
+:root {
+  --font-nunito: "Nunito", system-ui, -apple-system, sans-serif;
+  --font-fraunces: "Fraunces", Georgia, serif;
+}
