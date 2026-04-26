@@ -7,6 +7,7 @@ import { GripVertical } from "lucide-react";
 import { Button, Card, Logo, Pill } from "@/app/_components/ui";
 import { createGame } from "@/lib/actions";
 import { saveHostSecret } from "@/lib/session/storage";
+import { removeAllBots } from "@/lib/dev/bots";
 import {
   BABY_SHOWER_QUESTIONS,
   BABY_SHOWER_PARTY_QUESTIONS,
@@ -84,6 +85,10 @@ export default function HostNewPage() {
         theme,
         forceCode: partyMode ? "BABY" : undefined,
       });
+      // Clear any bots cached against this code from a previous game with
+      // the same code (party-mode reuses BABY) so they don't ghost-answer
+      // the fresh game's questions.
+      removeAllBots(game.code);
       saveHostSecret(game.code, game.host_secret);
       router.push(`/host/${game.code}`);
     } catch (e) {

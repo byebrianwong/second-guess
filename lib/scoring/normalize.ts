@@ -64,12 +64,26 @@ export function groupAnswers(answers: Answer[]): AnswerGroup[] {
     b.rawAnswers.push({ playerId: a.player_id, rawText: a.raw_text });
   }
   for (const b of buckets.values()) {
+    // 1. Prefer a raw text whose lowercase matches the group key. This makes
+    //    "the second group you click" win the label during a merge — when
+    //    `mergeAnswerGroups` writes the second-clicked key into every row,
+    //    the surviving label is the raw text of that target.
+    const target = b.key.startsWith("raw:") ? b.key.slice(4) : b.key;
+    const matchingRaw = b.rawAnswers.find(
+      (r) => r.rawText.trim().toLowerCase() === target,
+    );
+    if (matchingRaw) {
+      b.label = matchingRaw.rawText.trim();
+      continue;
+    }
+    // 2. Fallback: most-frequent raw text in the bucket.
     const tally: Record<string, number> = {};
     for (const r of b.rawAnswers) {
       const t = r.rawText.trim();
       tally[t] = (tally[t] || 0) + 1;
     }
-    b.label = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] || b.label;
+    b.label =
+      Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] || b.label;
   }
   return Array.from(buckets.values()).sort((a, b) => b.count - a.count);
 }
