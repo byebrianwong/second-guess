@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import { GripVertical } from "lucide-react";
 import { Button, Card, Logo, Pill } from "@/app/_components/ui";
@@ -27,6 +27,16 @@ function makeItems(texts: string[]): PromptItem[] {
 }
 
 export default function HostNewPage() {
+  // useSearchParams() needs to live inside a Suspense boundary so this
+  // route can prerender; without it, Next.js bails the build.
+  return (
+    <Suspense fallback={null}>
+      <HostNewInner />
+    </Suspense>
+  );
+}
+
+function HostNewInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const partyMode = searchParams.get("party") === "1";
