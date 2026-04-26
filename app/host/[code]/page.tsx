@@ -207,6 +207,15 @@ export default function HostGamePage({
                   count={currentAnswers.length}
                   total={snapshot.players.length}
                 />
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    size="lg"
+                    onClick={() => endQuestion(currentQuestion.id)}
+                    disabled={currentAnswers.length === 0}
+                  >
+                    End question →
+                  </Button>
+                </div>
               </Card>
 
               {currentAnswers.length > 0 && (
@@ -234,16 +243,6 @@ export default function HostGamePage({
                 answers={currentAnswers}
                 className="mb-4"
               />
-
-              <div className="flex justify-center">
-                <Button
-                  size="lg"
-                  onClick={() => endQuestion(currentQuestion.id)}
-                  disabled={currentAnswers.length === 0}
-                >
-                  End question →
-                </Button>
-              </div>
             </>
           )}
 
