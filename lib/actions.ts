@@ -41,29 +41,54 @@ function randomCode(): string {
 export async function createGame(opts: {
   prompts: string[];
   theme?: string;
+  forceCode?: string;
 }): Promise<{ game: Game; questions: Question[] }> {
   const supabase = getSupabase();
   const theme = opts.theme || "baby_shower";
 
   let game: Game | null = null;
-  let lastError: unknown = null;
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const code = randomCode();
+
+  if (opts.forceCode) {
     const { data, error } = await supabase
       .from("games")
-      .insert({ code, theme, status: "lobby", current_round: 0 })
+      .insert({
+        code: opts.forceCode,
+        theme,
+        status: "lobby",
+        current_round: 0,
+      })
       .select("*")
       .single();
-    if (!error && data) {
-      game = data as Game;
-      break;
+    if (error) {
+      if (error.code === "23505") {
+        throw new Error(
+          `A "${opts.forceCode}" game is already running. End it first.`,
+        );
+      }
+      throw new Error(`Failed to create game: ${error.message}`);
     }
-    lastError = error;
-    if (error?.code !== "23505") {
-      throw new Error(`Failed to create game: ${error?.message}`);
+    game = data as Game;
+  } else {
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const code = randomCode();
+      const { data, error } = await supabase
+        .from("games")
+        .insert({ code, theme, status: "lobby", current_round: 0 })
+        .select("*")
+        .single();
+      if (!error && data) {
+        game = data as Game;
+        break;
+      }
+      lastError = error;
+      if (error?.code !== "23505") {
+        throw new Error(`Failed to create game: ${error?.message}`);
+      }
     }
+    if (!game)
+      throw new Error(`Code collision after 10 tries: ${String(lastError)}`);
   }
-  if (!game) throw new Error(`Code collision after 10 tries: ${String(lastError)}`);
 
   const rows = opts.prompts.map((prompt, i) => ({
     game_id: game!.id,

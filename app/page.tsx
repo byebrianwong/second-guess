@@ -1,19 +1,45 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button, Input, Logo, Pill } from "./_components/ui";
+import { getGameByCode } from "@/lib/actions";
+import { getHostSecret } from "@/lib/session/storage";
 
 export default function Home() {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  function onJoin(e: React.FormEvent) {
+  async function onJoin(e: React.FormEvent) {
     e.preventDefault();
     const c = code.trim().toUpperCase();
+
+    // Party-mode escape hatch: typing HOST opens the host setup pre-loaded
+    // with the BABY_SHOWER_PARTY pack. If a BABY game is already running on
+    // this device (host_secret on disk), jump straight back to its panel.
+    if (c === "HOST") {
+      setBusy(true);
+      setError(null);
+      try {
+        const existingSecret = getHostSecret("BABY");
+        if (existingSecret) {
+          const existing = await getGameByCode("BABY");
+          if (existing && existing.status !== "finished") {
+            router.push("/host/BABY");
+            return;
+          }
+        }
+        router.push("/host/new?party=1");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        setBusy(false);
+      }
+      return;
+    }
+
     if (!/^[A-HJ-NP-Z]{4}$/.test(c)) {
       setError("Enter a 4-letter code (no I, O, or L).");
       return;
@@ -48,7 +74,7 @@ export default function Home() {
                 setCode(e.target.value.toUpperCase());
                 setError(null);
               }}
-              placeholder="ABCD"
+              placeholder="BABY"
               maxLength={4}
               autoCapitalize="characters"
               autoCorrect="off"
@@ -57,22 +83,10 @@ export default function Home() {
             />
           </label>
           {error && <p className="text-sm text-red-500">{error}</p>}
-          <Button type="submit" size="lg" className="w-full">
-            Join the room
+          <Button type="submit" size="lg" className="w-full" disabled={busy}>
+            {busy ? "Loading…" : "Join the room"}
           </Button>
         </form>
-
-        <div className="my-6 flex items-center gap-3 text-ink-faint text-xs uppercase tracking-widest">
-          <div className="flex-1 h-px bg-ink-faint/30" />
-          or
-          <div className="flex-1 h-px bg-ink-faint/30" />
-        </div>
-
-        <Link href="/host/new" className="block">
-          <Button variant="soft" size="lg" className="w-full">
-            🎤 Host a new game
-          </Button>
-        </Link>
       </motion.div>
     </main>
   );

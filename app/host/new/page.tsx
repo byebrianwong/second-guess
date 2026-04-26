@@ -1,13 +1,16 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import { GripVertical } from "lucide-react";
 import { Button, Card, Logo, Pill } from "@/app/_components/ui";
 import { createGame } from "@/lib/actions";
 import { saveHostSecret } from "@/lib/session/storage";
-import { BABY_SHOWER_QUESTIONS } from "@/lib/data/baby-shower-questions";
+import {
+  BABY_SHOWER_QUESTIONS,
+  BABY_SHOWER_PARTY_QUESTIONS,
+} from "@/lib/data/baby-shower-questions";
 
 interface PromptItem {
   id: string;
@@ -24,10 +27,19 @@ function makeItems(texts: string[]): PromptItem[] {
 
 export default function HostNewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const partyMode = searchParams.get("party") === "1";
+
   const [prompts, setPrompts] = useState<PromptItem[]>(() =>
-    makeItems(BABY_SHOWER_QUESTIONS.slice(0, 8)),
+    makeItems(
+      partyMode
+        ? BABY_SHOWER_PARTY_QUESTIONS
+        : BABY_SHOWER_QUESTIONS.slice(0, 8),
+    ),
   );
-  const [theme, setTheme] = useState("baby_shower");
+  const [theme, setTheme] = useState(
+    partyMode ? "baby_shower_party" : "baby_shower",
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,7 +79,11 @@ export default function HostNewPage() {
     setBusy(true);
     setError(null);
     try {
-      const { game } = await createGame({ prompts: cleaned, theme });
+      const { game } = await createGame({
+        prompts: cleaned,
+        theme,
+        forceCode: partyMode ? "BABY" : undefined,
+      });
       saveHostSecret(game.code, game.host_secret);
       router.push(`/host/${game.code}`);
     } catch (e) {
@@ -81,22 +97,39 @@ export default function HostNewPage() {
     <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
       <header className="flex items-center justify-between mb-6">
         <Logo />
-        <Pill tone="mint">host setup</Pill>
+        <Pill tone={partyMode ? "blush" : "mint"}>
+          {partyMode ? "BABY party setup" : "host setup"}
+        </Pill>
       </header>
 
       <Card className="mb-6">
         <h1 className="font-display text-2xl font-bold mb-1">Build your game</h1>
         <p className="text-ink-soft text-sm mb-4">
-          Edit the question list. Players join with a 4-letter code.
+          {partyMode
+            ? "Tweak the party questions if you want — or just hit Create. Players join with code BABY."
+            : "Edit the question list. Players join with a 4-letter code."}
         </p>
 
         <div className="flex gap-2 flex-wrap">
-          <Button variant="soft" size="sm" onClick={loadStarter} type="button">
-            Load 10 baby-shower starters
-          </Button>
-          <Button variant="ghost" size="sm" onClick={shuffle} type="button">
-            🎲 Shuffle
-          </Button>
+          {partyMode ? (
+            <Button
+              variant="soft"
+              size="sm"
+              onClick={() => setPrompts(makeItems(BABY_SHOWER_PARTY_QUESTIONS))}
+              type="button"
+            >
+              Reset to party defaults
+            </Button>
+          ) : (
+            <>
+              <Button variant="soft" size="sm" onClick={loadStarter} type="button">
+                Load 10 baby-shower starters
+              </Button>
+              <Button variant="ghost" size="sm" onClick={shuffle} type="button">
+                🎲 Shuffle
+              </Button>
+            </>
+          )}
           <Button variant="ghost" size="sm" onClick={addPrompt} type="button">
             + Add question
           </Button>
