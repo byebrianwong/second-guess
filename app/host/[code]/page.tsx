@@ -803,21 +803,24 @@ function AnswerGroupsPanel({
                   </button>
                 )}
               </div>
-              {g.rawAnswers.length > 0 && (
-                <div className="mt-1 text-xs text-ink-soft truncate">
-                  {g.rawAnswers
-                    .slice(0, 3)
-                    .map((r) => {
-                      const info = playerLookup.get(r.playerId);
-                      return info ? `${info.name} (${info.rank})` : null;
-                    })
-                    .filter(Boolean)
-                    .join(", ")}
-                  {g.rawAnswers.length > 3
-                    ? ` +${g.rawAnswers.length - 3} more`
-                    : ""}
-                </div>
-              )}
+              {g.rawAnswers.length > 0 && (() => {
+                const labels = g.rawAnswers
+                  .map((r) => {
+                    const info = playerLookup.get(r.playerId);
+                    return info ? `${info.name} (${info.rank})` : null;
+                  })
+                  .filter((s): s is string => Boolean(s));
+                if (labels.length === 0) return null;
+                const full = labels.join(", ");
+                return (
+                  <div
+                    className="mt-1 text-xs text-ink-soft truncate"
+                    title={full}
+                  >
+                    {full}
+                  </div>
+                );
+              })()}
             </motion.li>
           ))}
         </AnimatePresence>
