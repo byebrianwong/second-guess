@@ -178,6 +178,7 @@ export default function HostGamePage({
           </div>
           <CancelGameButton
             gameId={game.id}
+            code={code}
             partyMode={game.theme === "baby_shower_party"}
             className="mt-10"
           />
@@ -459,10 +460,12 @@ function CompactShare({ code }: { code: string }) {
 
 function CancelGameButton({
   gameId,
+  code,
   partyMode = false,
   className,
 }: {
   gameId: string;
+  code: string;
   partyMode?: boolean;
   className?: string;
 }) {
@@ -480,6 +483,9 @@ function CancelGameButton({
     setBusy(true);
     try {
       await cancelGame(gameId);
+      // Forget bots tied to this code — the next game with the same code
+      // (party mode reuses BABY) should start fresh.
+      removeAllBots(code);
       router.push(partyMode ? "/host/new?party=1" : "/host/new");
     } finally {
       setBusy(false);
