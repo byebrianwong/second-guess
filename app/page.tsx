@@ -9,7 +9,9 @@ import { getHostSecret } from "@/lib/session/storage";
 
 export default function Home() {
   const router = useRouter();
-  const [code, setCode] = useState("");
+  // Pre-fill BABY so the typical case (joining the party room) is one click.
+  // Host clears it and types HOST to drop into the host setup flow.
+  const [code, setCode] = useState("BABY");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
