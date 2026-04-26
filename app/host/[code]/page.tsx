@@ -196,10 +196,10 @@ export default function HostGamePage({
           {currentQuestion.state === "open" && (
             <>
               <Card className="mb-4">
-                <h2 className="font-display text-2xl sm:text-3xl font-bold text-center mb-4">
+                <h2 className="font-display text-2xl sm:text-3xl font-bold text-center mb-3">
                   {currentQuestion.prompt}
                 </h2>
-                <p className="text-center text-ink-soft mb-4">
+                <p className="text-center text-ink-soft mb-3 text-sm">
                   {currentAnswers.length} of {snapshot.players.length} answered
                 </p>
                 <AnswerProgress
@@ -207,6 +207,33 @@ export default function HostGamePage({
                   total={snapshot.players.length}
                 />
               </Card>
+
+              {currentAnswers.length > 0 && (
+                <AnswerGroupsPanel
+                  groups={groupAnswers(currentAnswers)}
+                  onMerge={(from, into) =>
+                    mergeAnswerGroups({
+                      questionId: currentQuestion.id,
+                      fromKey: from,
+                      intoKey: into,
+                    })
+                  }
+                  onUnmerge={(key) =>
+                    unmergeAnswerGroup({
+                      questionId: currentQuestion.id,
+                      groupKey: key,
+                    })
+                  }
+                  hint="Group as you go — tap two answers to merge, tap × to split."
+                />
+              )}
+
+              <PlayerAnswerRoster
+                players={snapshot.players}
+                answers={currentAnswers}
+                className="mb-4"
+              />
+
               <div className="flex justify-center">
                 <Button
                   size="lg"
@@ -661,6 +688,39 @@ function ReviewScreen({
   onUnmerge: (key: string) => Promise<void>;
   onReveal: () => Promise<void>;
 }) {
+  return (
+    <>
+      <Card className="mb-4">
+        <h2 className="font-display text-2xl font-bold text-center">
+          {prompt}
+        </h2>
+      </Card>
+      <AnswerGroupsPanel
+        groups={groups}
+        onMerge={onMerge}
+        onUnmerge={onUnmerge}
+        hint="Tap two groups to merge them. Tap × to split a merged group."
+      />
+      <div className="flex justify-center gap-2">
+        <Button onClick={onReveal} size="lg">
+          Reveal answers ✨
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function AnswerGroupsPanel({
+  groups,
+  onMerge,
+  onUnmerge,
+  hint,
+}: {
+  groups: ReturnType<typeof groupAnswers>;
+  onMerge: (fromKey: string, intoKey: string) => Promise<void>;
+  onUnmerge: (key: string) => Promise<void>;
+  hint?: string;
+}) {
   const [selected, setSelected] = useState<string | null>(null);
 
   async function tap(key: string) {
@@ -672,72 +732,122 @@ function ReviewScreen({
       setSelected(null);
       return;
     }
-    // Merge `selected` into `key` (key wins as the surviving group).
+    // Merge `selected` into `key` — the second-clicked group's key wins,
+    // so its label survives in the merged display.
     await onMerge(selected, key);
     setSelected(null);
   }
 
   return (
-    <>
-      <Card className="mb-4">
-        <h2 className="font-display text-2xl font-bold text-center mb-1">
-          {prompt}
-        </h2>
-        <p className="text-center text-ink-soft text-sm mb-4">
-          Tap two groups to merge them. Tap a merged group's × to split it.
-        </p>
-
-        <ul className="space-y-2">
-          <AnimatePresence>
-            {groups.map((g) => (
-              <motion.li
-                layout
-                key={g.key}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className={`flex items-center gap-2 p-3 rounded-pill border-2 cursor-pointer transition ${
-                  selected === g.key
-                    ? "border-blush-deep bg-blush/30"
-                    : "border-ink-faint/30 bg-white hover:border-blush-deep/50"
-                }`}
-                onClick={() => tap(g.key)}
-              >
-                <span className="font-display text-lg font-bold flex-1 truncate">
-                  {g.label}
+    <Card className="mb-4">
+      {hint && (
+        <p className="text-center text-ink-soft text-xs mb-3">{hint}</p>
+      )}
+      <ul className="space-y-2">
+        <AnimatePresence>
+          {groups.map((g) => (
+            <motion.li
+              layout
+              key={g.key}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className={`flex items-center gap-2 p-3 rounded-pill border-2 cursor-pointer transition ${
+                selected === g.key
+                  ? "border-blush-deep bg-blush/30"
+                  : "border-ink-faint/30 bg-white hover:border-blush-deep/50"
+              }`}
+              onClick={() => tap(g.key)}
+            >
+              <span className="font-display text-lg font-bold flex-1 truncate">
+                {g.label}
+              </span>
+              <Pill tone="mint">×{g.count}</Pill>
+              {g.rawAnswers.length > 1 && (
+                <span className="text-xs text-ink-soft hidden sm:inline truncate max-w-[10rem]">
+                  {[...new Set(g.rawAnswers.map((r) => r.rawText))]
+                    .slice(0, 3)
+                    .join(", ")}
                 </span>
-                <Pill tone="mint">×{g.count}</Pill>
-                {g.rawAnswers.length > 1 && (
-                  <span className="text-xs text-ink-soft hidden sm:inline">
-                    {[...new Set(g.rawAnswers.map((r) => r.rawText))]
-                      .slice(0, 3)
-                      .join(", ")}
-                  </span>
-                )}
-                {hasMergedKeys(g) && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onUnmerge(g.key);
-                    }}
-                    className="text-ink-soft hover:text-red-500 px-2"
-                    title="Split this group"
-                  >
-                    split
-                  </button>
-                )}
-              </motion.li>
-            ))}
-          </AnimatePresence>
-        </ul>
-      </Card>
+              )}
+              {hasMergedKeys(g) && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUnmerge(g.key);
+                  }}
+                  className="text-ink-soft hover:text-red-500 px-2 text-xs"
+                  title="Split this group"
+                >
+                  split
+                </button>
+              )}
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
+    </Card>
+  );
+}
 
-      <div className="flex justify-center gap-2">
-        <Button onClick={onReveal} size="lg">
-          Reveal answers ✨
-        </Button>
-      </div>
-    </>
+function PlayerAnswerRoster({
+  players,
+  answers,
+  className,
+}: {
+  players: { id: string; name: string; avatar: string }[];
+  answers: { player_id: string; raw_text: string }[];
+  className?: string;
+}) {
+  const byPlayer = new Map(answers.map((a) => [a.player_id, a]));
+  const answered = players.filter((p) => byPlayer.has(p.id));
+  const waiting = players.filter((p) => !byPlayer.has(p.id));
+  // Most recently arrived first within "answered" so the host sees new
+  // submissions at the top.
+  return (
+    <Card className={className}>
+      <h3 className="font-display text-lg font-bold mb-2">Players</h3>
+      <ul className="space-y-1.5 text-sm">
+        <AnimatePresence>
+          {answered.map((p) => (
+            <motion.li
+              key={p.id}
+              layout
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: "spring", stiffness: 280, damping: 22 }}
+              className="flex items-center gap-2"
+            >
+              <span className="text-xl shrink-0">{p.avatar}</span>
+              <span className="font-semibold w-24 sm:w-32 truncate">
+                {p.name}
+              </span>
+              <span className="font-mono text-ink truncate flex-1">
+                {byPlayer.get(p.id)!.raw_text}
+              </span>
+            </motion.li>
+          ))}
+          {waiting.map((p) => (
+            <motion.li
+              key={p.id}
+              layout
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ type: "spring", stiffness: 280, damping: 22 }}
+              className="flex items-center gap-2 opacity-60"
+            >
+              <span className="text-xl shrink-0">{p.avatar}</span>
+              <span className="font-semibold w-24 sm:w-32 truncate">
+                {p.name}
+              </span>
+              <span className="text-ink-faint italic flex-1">
+                …answering
+              </span>
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
+    </Card>
   );
 }
 
