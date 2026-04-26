@@ -26,6 +26,23 @@ export const BABY_SHOWER_QUESTIONS: string[] = [
   "Name a thing in a kid's bath.",
 ];
 
+// Curated 11-question pack used by the temporary party-mode HOST/BABY flow.
+// (See lib/actions.ts → getOrCreateBabyHost.)
+export const BABY_SHOWER_PARTY_QUESTIONS: string[] = [
+  "Name a Disney movie.",
+  "Name a baby's first word.",
+  "Name something kids get in trouble for.",
+  "Name a kids' breakfast cereal.",
+  "Name the hardest subject in school.",
+  "Name a sport kids rarely play.",
+  "Name a road trip snack.",
+  "Name something a toddler says \"no\" to.",
+  "Name the best holiday.",
+  "Name a kids' favorite part of school.",
+  "Name a profession kids want to be when they grow up.",
+];
+
 export const STARTER_PACKS: Record<string, string[]> = {
   baby_shower: BABY_SHOWER_QUESTIONS,
+  baby_shower_party: BABY_SHOWER_PARTY_QUESTIONS,
 };

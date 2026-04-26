@@ -176,7 +176,11 @@ export default function HostGamePage({
               {totalQuestions} {totalQuestions === 1 ? "question" : "questions"} ready
             </p>
           </div>
-          <CancelGameButton gameId={game.id} className="mt-10" />
+          <CancelGameButton
+            gameId={game.id}
+            partyMode={game.theme === "baby_shower_party"}
+            className="mt-10"
+          />
         </>
       )}
 
@@ -286,7 +290,11 @@ export default function HostGamePage({
       )}
 
       {game.status === "finished" && (
-        <FinalLeaderboard players={snapshot.players} totals={totals} />
+        <FinalLeaderboard
+          players={snapshot.players}
+          totals={totals}
+          partyMode={game.theme === "baby_shower_party"}
+        />
       )}
 
       <Reactions gameId={gameId} />
@@ -424,9 +432,11 @@ function CompactShare({ code }: { code: string }) {
 
 function CancelGameButton({
   gameId,
+  partyMode = false,
   className,
 }: {
   gameId: string;
+  partyMode?: boolean;
   className?: string;
 }) {
   const router = useRouter();
@@ -443,7 +453,7 @@ function CancelGameButton({
     setBusy(true);
     try {
       await cancelGame(gameId);
-      router.push("/host/new");
+      router.push(partyMode ? "/host/new?party=1" : "/host/new");
     } finally {
       setBusy(false);
     }
@@ -740,9 +750,11 @@ function hasMergedKeys(g: ReturnType<typeof groupAnswers>[number]): boolean {
 function FinalLeaderboard({
   players,
   totals,
+  partyMode = false,
 }: {
   players: { id: string; name: string; avatar: string }[];
   totals: Map<string, number>;
+  partyMode?: boolean;
 }) {
   const router = useRouter();
   const sorted = [...players].sort(
@@ -760,7 +772,7 @@ function FinalLeaderboard({
         "Start a brand new game? This room will be left behind and you'll get a new code.",
       )
     ) {
-      router.push("/host/new");
+      router.push(partyMode ? "/host/new?party=1" : "/host/new");
     }
   }
 
