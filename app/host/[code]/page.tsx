@@ -101,6 +101,20 @@ export default function HostGamePage({
     return t;
   }, [snapshot.scores]);
 
+  // Cumulative ranks (tie-aware) before this round's points get added.
+  // Used to label live answers as e.g. "Banjo (2)".
+  const playerLookup = useMemo(() => {
+    const sorted = [...snapshot.players].sort(
+      (a, b) => (totals.get(b.id) ?? 0) - (totals.get(a.id) ?? 0),
+    );
+    const ranks = tieRanks(sorted, (p) => totals.get(p.id) ?? 0);
+    const lookup = new Map<string, { name: string; rank: number }>();
+    sorted.forEach((p, i) => {
+      lookup.set(p.id, { name: p.name, rank: ranks[i] });
+    });
+    return lookup;
+  }, [snapshot.players, totals]);
+
   if (authError) {
     return (
       <main className="flex-1 flex flex-col items-center justify-center p-6">
@@ -221,6 +235,7 @@ export default function HostGamePage({
               {currentAnswers.length > 0 && (
                 <AnswerGroupsPanel
                   groups={groupAnswers(currentAnswers)}
+                  playerLookup={playerLookup}
                   onMerge={(from, into) =>
                     mergeAnswerGroups({
                       questionId: currentQuestion.id,
@@ -251,6 +266,7 @@ export default function HostGamePage({
               questionId={currentQuestion.id}
               prompt={currentQuestion.prompt}
               groups={groupAnswers(currentAnswers)}
+              playerLookup={playerLookup}
               onMerge={(from, into) =>
                 mergeAnswerGroups({
                   questionId: currentQuestion.id,
@@ -682,6 +698,7 @@ function ReviewScreen({
   questionId: _questionId,
   prompt,
   groups,
+  playerLookup,
   onMerge,
   onUnmerge,
   onReveal,
@@ -689,6 +706,7 @@ function ReviewScreen({
   questionId: string;
   prompt: string;
   groups: ReturnType<typeof groupAnswers>;
+  playerLookup: Map<string, { name: string; rank: number }>;
   onMerge: (fromKey: string, intoKey: string) => Promise<void>;
   onUnmerge: (key: string) => Promise<void>;
   onReveal: () => Promise<void>;
@@ -702,6 +720,7 @@ function ReviewScreen({
       </Card>
       <AnswerGroupsPanel
         groups={groups}
+        playerLookup={playerLookup}
         onMerge={onMerge}
         onUnmerge={onUnmerge}
         hint="Tap two groups to merge them. Tap × to split a merged group."
@@ -717,11 +736,13 @@ function ReviewScreen({
 
 function AnswerGroupsPanel({
   groups,
+  playerLookup,
   onMerge,
   onUnmerge,
   hint,
 }: {
   groups: ReturnType<typeof groupAnswers>;
+  playerLookup: Map<string, { name: string; rank: number }>;
   onMerge: (fromKey: string, intoKey: string) => Promise<void>;
   onUnmerge: (key: string) => Promise<void>;
   hint?: string;
@@ -757,35 +778,45 @@ function AnswerGroupsPanel({
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className={`flex items-center gap-2 p-3 rounded-pill border-2 cursor-pointer transition ${
+              className={`p-3 rounded-2xl border-2 cursor-pointer transition ${
                 selected === g.key
                   ? "border-blush-deep bg-blush/30"
                   : "border-ink-faint/30 bg-white hover:border-blush-deep/50"
               }`}
               onClick={() => tap(g.key)}
             >
-              <span className="font-display text-lg font-bold flex-1 truncate">
-                {g.label}
-              </span>
-              <Pill tone="mint">×{g.count}</Pill>
-              {g.rawAnswers.length > 1 && (
-                <span className="text-xs text-ink-soft hidden sm:inline truncate max-w-[10rem]">
-                  {[...new Set(g.rawAnswers.map((r) => r.rawText))]
-                    .slice(0, 3)
-                    .join(", ")}
+              <div className="flex items-center gap-2">
+                <span className="font-display text-lg font-bold flex-1 truncate">
+                  {g.label}
                 </span>
-              )}
-              {hasMergedKeys(g) && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUnmerge(g.key);
-                  }}
-                  className="text-ink-soft hover:text-red-500 px-2 text-xs"
-                  title="Split this group"
-                >
-                  split
-                </button>
+                <Pill tone="mint">×{g.count}</Pill>
+                {hasMergedKeys(g) && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUnmerge(g.key);
+                    }}
+                    className="text-ink-soft hover:text-red-500 px-2 text-xs"
+                    title="Split this group"
+                  >
+                    split
+                  </button>
+                )}
+              </div>
+              {g.rawAnswers.length > 0 && (
+                <div className="mt-1 text-xs text-ink-soft truncate">
+                  {g.rawAnswers
+                    .slice(0, 3)
+                    .map((r) => {
+                      const info = playerLookup.get(r.playerId);
+                      return info ? `${info.name} (${info.rank})` : null;
+                    })
+                    .filter(Boolean)
+                    .join(", ")}
+                  {g.rawAnswers.length > 3
+                    ? ` +${g.rawAnswers.length - 3} more`
+                    : ""}
+                </div>
               )}
             </motion.li>
           ))}
