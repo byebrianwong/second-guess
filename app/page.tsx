@@ -5,7 +5,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button, Input, Logo, Pill } from "./_components/ui";
 import { getGameByCode } from "@/lib/actions";
-import { getHostSecret } from "@/lib/session/storage";
+import { saveHostSecret } from "@/lib/session/storage";
 
 export default function Home() {
   const router = useRouter();
@@ -19,22 +19,23 @@ export default function Home() {
     e.preventDefault();
     const c = code.trim().toUpperCase();
 
-    // Party-mode escape hatch: typing HOST opens the host setup pre-loaded
-    // with the BABY_SHOWER_PARTY pack. If a BABY game is already running on
-    // this device (host_secret on disk), jump straight back to its panel.
+    // Party-mode escape hatch: typing HOST takes over the active BABY game
+    // from any device. We pull the existing room's host_secret straight from
+    // the DB and write it to this device's localStorage, so any phone in the
+    // room can become the host (the secret is exposed via the games row read
+    // policy — fine for a private party). If no active BABY game exists, fall
+    // through to the setup flow with the party preset pre-loaded.
     if (c === "HOST") {
       setBusy(true);
       setError(null);
       try {
-        const existingSecret = getHostSecret("BABY");
-        if (existingSecret) {
-          const existing = await getGameByCode("BABY");
-          if (existing && existing.status !== "finished") {
-            router.push("/host/BABY");
-            return;
-          }
+        const existing = await getGameByCode("BABY");
+        if (existing && existing.status !== "finished") {
+          saveHostSecret("BABY", existing.host_secret);
+          router.push("/host/BABY");
+        } else {
+          router.push("/host/new?party=1");
         }
-        router.push("/host/new?party=1");
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
         setBusy(false);
