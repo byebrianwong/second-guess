@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -9,9 +10,7 @@ import { saveHostSecret } from "@/lib/session/storage";
 
 export default function Home() {
   const router = useRouter();
-  // Pre-fill BABY so the typical case (joining the party room) is one click.
-  // Host clears it and types HOST to drop into the host setup flow.
-  const [code, setCode] = useState("BABY");
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -77,7 +76,7 @@ export default function Home() {
                 setCode(e.target.value.toUpperCase());
                 setError(null);
               }}
-              placeholder="BABY"
+              placeholder="ABCD"
               maxLength={4}
               autoCapitalize="characters"
               autoCorrect="off"
@@ -90,6 +89,18 @@ export default function Home() {
             {busy ? "Loading…" : "Join the room"}
           </Button>
         </form>
+
+        <div className="my-6 flex items-center gap-3 text-ink-faint text-xs uppercase tracking-widest">
+          <div className="flex-1 h-px bg-ink-faint/30" />
+          or
+          <div className="flex-1 h-px bg-ink-faint/30" />
+        </div>
+
+        <Link href="/host/new" className="block">
+          <Button variant="soft" size="lg" className="w-full">
+            🎤 Host a new game
+          </Button>
+        </Link>
       </motion.div>
     </main>
   );
