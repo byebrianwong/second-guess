@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import { GripVertical } from "lucide-react";
 import { Button, Card, Logo, Pill } from "@/app/_components/ui";
@@ -11,6 +12,7 @@ import { removeAllBots } from "@/lib/dev/bots";
 import {
   BABY_SHOWER_QUESTIONS,
   BABY_SHOWER_PARTY_QUESTIONS,
+  GENERAL_STARTER_QUESTIONS,
 } from "@/lib/data/baby-shower-questions";
 
 interface PromptItem {
@@ -53,13 +55,21 @@ function HostNewInner() {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Id of a prompt that was just added — its row will autofocus on mount.
+  const [autoFocusId, setAutoFocusId] = useState<string | null>(null);
 
   function setPromptText(id: string, value: string) {
     setPrompts((p) => p.map((x) => (x.id === id ? { ...x, text: value } : x)));
   }
 
   function addPrompt() {
-    setPrompts((p) => [...p, makeItem("")]);
+    const item = makeItem("");
+    setPrompts((p) => [...p, item]);
+    setAutoFocusId(item.id);
+  }
+
+  function loadGeneral() {
+    setPrompts(makeItems(GENERAL_STARTER_QUESTIONS));
   }
 
   function removePrompt(id: string) {
@@ -111,7 +121,9 @@ function HostNewInner() {
   return (
     <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
       <header className="flex items-center justify-between mb-6">
-        <Logo />
+        <Link href="/" className="hover:opacity-80 transition" aria-label="Home">
+          <Logo />
+        </Link>
         <Pill tone={partyMode ? "blush" : "mint"}>
           {partyMode ? "BABY party setup" : "host setup"}
         </Pill>
@@ -139,6 +151,9 @@ function HostNewInner() {
             <>
               <Button variant="soft" size="sm" onClick={loadStarter} type="button">
                 Load 10 baby-shower starters
+              </Button>
+              <Button variant="soft" size="sm" onClick={loadGeneral} type="button">
+                Load general starter list
               </Button>
               <Button variant="ghost" size="sm" onClick={shuffle} type="button">
                 🎲 Shuffle
@@ -168,6 +183,7 @@ function HostNewInner() {
               key={p.id}
               item={p}
               index={i}
+              autoFocus={p.id === autoFocusId}
               onChange={(text) => setPromptText(p.id, text)}
               onRemove={() => removePrompt(p.id)}
             />
@@ -187,15 +203,28 @@ function HostNewInner() {
 function QuestionRow({
   item,
   index,
+  autoFocus = false,
   onChange,
   onRemove,
 }: {
   item: PromptItem;
   index: number;
+  autoFocus?: boolean;
   onChange: (text: string) => void;
   onRemove: () => void;
 }) {
   const controls = useDragControls();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // When this row was just added via "+ Add question", focus the textarea
+  // and bring it into view so the host can start typing immediately.
+  useEffect(() => {
+    if (!autoFocus || !textareaRef.current) return;
+    textareaRef.current.focus();
+    textareaRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Mount-only — we don't want to keep refocusing on every re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Reorder.Item
@@ -221,6 +250,7 @@ function QuestionRow({
         {index + 1}.
       </span>
       <textarea
+        ref={textareaRef}
         value={item.text}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Name a..."

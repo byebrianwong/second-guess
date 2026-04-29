@@ -42,7 +42,23 @@ export const BABY_SHOWER_PARTY_QUESTIONS: string[] = [
   "Name a profession kids want to be when they grow up.",
 ];
 
+// 10 general-purpose questions for non-themed parties. Each has a glaringly
+// obvious #1 (so collusion fails) and a meaty cluster of plausible #2-#5s.
+export const GENERAL_STARTER_QUESTIONS: string[] = [
+  "Name a fast food chain.",
+  "Name a US state.",
+  "Name a Marvel superhero.",
+  "Name a board game.",
+  "Name a fruit.",
+  "Name a sport.",
+  "Name a soda brand.",
+  "Name a kitchen appliance.",
+  "Name a country in Europe.",
+  "Name a holiday.",
+];
+
 export const STARTER_PACKS: Record<string, string[]> = {
   baby_shower: BABY_SHOWER_QUESTIONS,
   baby_shower_party: BABY_SHOWER_PARTY_QUESTIONS,
+  general: GENERAL_STARTER_QUESTIONS,
 };
