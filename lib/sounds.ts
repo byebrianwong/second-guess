@@ -133,18 +133,10 @@ export function playTabulating() {
 export function playRevealTier(rank: number) {
   play(() => {
     if (rank === 1) {
-      // sad-trombone slide
-      note(440, 0.18, {
-        type: "sawtooth",
-        gain: 0.16,
-        glideTo: 330,
-      });
-      note(330, 0.22, {
-        type: "sawtooth",
-        gain: 0.14,
-        startAt: 0.14,
-        glideTo: 247,
-      });
+      // Two short same-pitch "boops" — neutral, slightly comic.
+      // Conveys "yep, the obvious one" without the sad-trombone melodrama.
+      note(660, 0.09, { type: "triangle", gain: 0.14 });
+      note(660, 0.09, { type: "triangle", gain: 0.14, startAt: 0.13 });
       return;
     }
     if (rank === 2) {
