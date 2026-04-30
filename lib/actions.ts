@@ -199,14 +199,6 @@ export async function submitAnswer(opts: {
   }
 }
 
-export async function endQuestion(questionId: string) {
-  const supabase = getSupabase();
-  await supabase
-    .from("questions")
-    .update({ state: "reviewing", closed_at: new Date().toISOString() })
-    .eq("id", questionId);
-}
-
 export async function mergeAnswerGroups(opts: {
   questionId: string;
   fromKey: string;
@@ -260,6 +252,13 @@ export async function unmergeAnswerGroup(opts: {
 
 export async function revealQuestion(questionId: string) {
   const supabase = getSupabase();
+  // Lock the question (no new submissions sneak in) before finalizing scores.
+  // We intentionally pass through the 'closed' state without a separate
+  // host-facing review screen — the merge UI is now live during 'open'.
+  await supabase
+    .from("questions")
+    .update({ state: "closed", closed_at: new Date().toISOString() })
+    .eq("id", questionId);
   const { error } = await supabase.rpc("finalize_question", {
     p_question_id: questionId,
   });

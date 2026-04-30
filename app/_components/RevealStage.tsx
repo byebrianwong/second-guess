@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { AnswerGroup, RoundScore } from "@/lib/types";
 import { pointsForRank, computeRanks } from "@/lib/scoring/normalize";
+import { playRevealTier, playTabulating } from "@/lib/sounds";
 
 interface RevealRow {
   rank: number;
@@ -64,6 +65,7 @@ export function RevealStage({
       setRevealedRanks(rows.map((r) => r.rank));
       return;
     }
+    playTabulating();
     const ttab = setTimeout(() => setPhase("revealing"), 1200);
     return () => clearTimeout(ttab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -71,8 +73,12 @@ export function RevealStage({
 
   useEffect(() => {
     if (phase !== "revealing") return;
-    const order = [...rows].reverse(); // reveal #5 -> #4 -> ... -> #1
-    if (order.length === 0) {
+    // Reveal one *tier* per tick — tied groups share a rank and get
+    // unveiled together with a single sound. Walk distinct ranks in
+    // descending order (rank 5 → rank 1) so suspense builds toward #1.
+    const distinctRanks = Array.from(new Set(rows.map((r) => r.rank)))
+      .sort((a, b) => b - a);
+    if (distinctRanks.length === 0) {
       setPhase("done");
       return;
     }
@@ -82,12 +88,13 @@ export function RevealStage({
 
     const tick = () => {
       if (cancelled) return;
-      if (i >= order.length) {
+      if (i >= distinctRanks.length) {
         setPhase("done");
         return;
       }
-      const rank = order[i].rank;
+      const rank = distinctRanks[i];
       setRevealedRanks((r) => [...r, rank]);
+      playRevealTier(rank);
       i += 1;
       timeoutId = setTimeout(tick, 900);
     };

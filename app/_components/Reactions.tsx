@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
 import { REACTION_EMOJI } from "@/lib/avatars";
+import { playReactionPop } from "@/lib/sounds";
 import { cn } from "@/lib/utils";
 
 interface Float {
@@ -43,6 +44,7 @@ export function Reactions({
       .channel(`reactions:${gameId}`)
       .on("broadcast", { event: "reaction" }, ({ payload }) => {
         spawnFloat((payload as { emoji: string }).emoji);
+        playReactionPop();
       })
       .subscribe();
     channelRef.current = channel;
@@ -60,6 +62,7 @@ export function Reactions({
     if (now - lastSent.current < 700) return;
     lastSent.current = now;
     spawnFloat(emoji);
+    playReactionPop();
     channel.send({ type: "broadcast", event: "reaction", payload: { emoji } });
   }
 

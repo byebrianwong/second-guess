@@ -10,12 +10,12 @@ import { Lobby } from "@/app/_components/Lobby";
 import { Reactions } from "@/app/_components/Reactions";
 import { RevealStage } from "@/app/_components/RevealStage";
 import { Standings } from "@/app/_components/Standings";
+import { SoundToggle } from "@/app/_components/SoundToggle";
 import { useGameChannel } from "@/lib/supabase/realtime";
 import { getSupabase } from "@/lib/supabase/client";
 import { groupAnswers } from "@/lib/scoring/normalize";
 import {
   startGame,
-  endQuestion,
   revealQuestion,
   nextQuestion,
   mergeAnswerGroups,
@@ -26,6 +26,7 @@ import {
 } from "@/lib/actions";
 import { getHostSecret } from "@/lib/session/storage";
 import { joinNames, tieRanks } from "@/lib/utils";
+import { playFanfare } from "@/lib/sounds";
 import {
   addBot,
   botAnswerNow,
@@ -146,6 +147,7 @@ export default function HostGamePage({
         <Logo compact={game.status === "active"} />
         <div className="flex items-center gap-2 min-w-0">
           {game.status === "active" && <CompactShare code={code} />}
+          <SoundToggle />
           <Pill tone="lavender">HOST</Pill>
         </div>
       </header>
@@ -208,7 +210,9 @@ export default function HostGamePage({
             <Pill tone="lemon">{stateLabel(currentQuestion.state)}</Pill>
           </div>
 
-          {currentQuestion.state === "open" && (
+          {(currentQuestion.state === "open" ||
+            currentQuestion.state === "closed" ||
+            currentQuestion.state === "reviewing") && (
             <>
               <Card className="mb-4">
                 <h2 className="font-display text-2xl sm:text-3xl font-bold text-center mb-3">
@@ -221,16 +225,21 @@ export default function HostGamePage({
                   count={currentAnswers.length}
                   total={snapshot.players.length}
                 />
-                <div className="mt-4 flex justify-center">
+              </Card>
+
+              {/* Sticky reveal button — stays visible after the prompt
+                  card scrolls off the top. */}
+              <div className="sticky top-2 z-30 mb-4 flex justify-center pointer-events-none">
+                <div className="pointer-events-auto">
                   <Button
                     size="lg"
-                    onClick={() => endQuestion(currentQuestion.id)}
+                    onClick={() => revealQuestion(currentQuestion.id)}
                     disabled={currentAnswers.length === 0}
                   >
-                    End question →
+                    Reveal answers →
                   </Button>
                 </div>
-              </Card>
+              </div>
 
               {currentAnswers.length > 0 && (
                 <AnswerGroupsPanel
@@ -249,7 +258,7 @@ export default function HostGamePage({
                       groupKey: key,
                     })
                   }
-                  hint="Group as you go — tap two answers to merge, tap × to split."
+                  hint="Group as you go. Tap two answers to merge (2nd name is kept)"
                 />
               )}
 
@@ -259,29 +268,6 @@ export default function HostGamePage({
                 className="mb-4"
               />
             </>
-          )}
-
-          {currentQuestion.state === "reviewing" && (
-            <ReviewScreen
-              questionId={currentQuestion.id}
-              prompt={currentQuestion.prompt}
-              groups={groupAnswers(currentAnswers)}
-              playerLookup={playerLookup}
-              onMerge={(from, into) =>
-                mergeAnswerGroups({
-                  questionId: currentQuestion.id,
-                  fromKey: from,
-                  intoKey: into,
-                })
-              }
-              onUnmerge={(key) =>
-                unmergeAnswerGroup({
-                  questionId: currentQuestion.id,
-                  groupKey: key,
-                })
-              }
-              onReveal={() => revealQuestion(currentQuestion.id)}
-            />
           )}
 
           {currentQuestion.state === "revealed" && (
@@ -694,46 +680,6 @@ function AnswerProgress({ count, total }: { count: number; total: number }) {
   );
 }
 
-function ReviewScreen({
-  questionId: _questionId,
-  prompt,
-  groups,
-  playerLookup,
-  onMerge,
-  onUnmerge,
-  onReveal,
-}: {
-  questionId: string;
-  prompt: string;
-  groups: ReturnType<typeof groupAnswers>;
-  playerLookup: Map<string, { name: string; rank: number }>;
-  onMerge: (fromKey: string, intoKey: string) => Promise<void>;
-  onUnmerge: (key: string) => Promise<void>;
-  onReveal: () => Promise<void>;
-}) {
-  return (
-    <>
-      <Card className="mb-4">
-        <h2 className="font-display text-2xl font-bold text-center">
-          {prompt}
-        </h2>
-      </Card>
-      <AnswerGroupsPanel
-        groups={groups}
-        playerLookup={playerLookup}
-        onMerge={onMerge}
-        onUnmerge={onUnmerge}
-        hint="Tap two groups to merge them. Tap × to split a merged group."
-      />
-      <div className="flex justify-center gap-2">
-        <Button onClick={onReveal} size="lg">
-          Reveal answers ✨
-        </Button>
-      </div>
-    </>
-  );
-}
-
 function AnswerGroupsPanel({
   groups,
   playerLookup,
@@ -906,6 +852,9 @@ function FinalLeaderboard({
   partyMode?: boolean;
 }) {
   const router = useRouter();
+  useEffect(() => {
+    playFanfare();
+  }, []);
   const sorted = [...players].sort(
     (a, b) => (totals.get(b.id) ?? 0) - (totals.get(a.id) ?? 0),
   );
