@@ -15,7 +15,6 @@ import { getSupabase } from "@/lib/supabase/client";
 import { groupAnswers } from "@/lib/scoring/normalize";
 import {
   startGame,
-  endQuestion,
   revealQuestion,
   nextQuestion,
   mergeAnswerGroups,
@@ -208,7 +207,9 @@ export default function HostGamePage({
             <Pill tone="lemon">{stateLabel(currentQuestion.state)}</Pill>
           </div>
 
-          {currentQuestion.state === "open" && (
+          {(currentQuestion.state === "open" ||
+            currentQuestion.state === "closed" ||
+            currentQuestion.state === "reviewing") && (
             <>
               <Card className="mb-4">
                 <h2 className="font-display text-2xl sm:text-3xl font-bold text-center mb-3">
@@ -221,16 +222,21 @@ export default function HostGamePage({
                   count={currentAnswers.length}
                   total={snapshot.players.length}
                 />
-                <div className="mt-4 flex justify-center">
+              </Card>
+
+              {/* Sticky reveal button — stays visible after the prompt
+                  card scrolls off the top. */}
+              <div className="sticky top-2 z-30 mb-4 flex justify-center pointer-events-none">
+                <div className="pointer-events-auto">
                   <Button
                     size="lg"
-                    onClick={() => endQuestion(currentQuestion.id)}
+                    onClick={() => revealQuestion(currentQuestion.id)}
                     disabled={currentAnswers.length === 0}
                   >
-                    End question →
+                    Reveal answers →
                   </Button>
                 </div>
-              </Card>
+              </div>
 
               {currentAnswers.length > 0 && (
                 <AnswerGroupsPanel
@@ -249,7 +255,7 @@ export default function HostGamePage({
                       groupKey: key,
                     })
                   }
-                  hint="Group as you go — tap two answers to merge, tap × to split."
+                  hint="Group as you go. Tap two answers to merge (2nd name is kept)"
                 />
               )}
 
@@ -259,29 +265,6 @@ export default function HostGamePage({
                 className="mb-4"
               />
             </>
-          )}
-
-          {currentQuestion.state === "reviewing" && (
-            <ReviewScreen
-              questionId={currentQuestion.id}
-              prompt={currentQuestion.prompt}
-              groups={groupAnswers(currentAnswers)}
-              playerLookup={playerLookup}
-              onMerge={(from, into) =>
-                mergeAnswerGroups({
-                  questionId: currentQuestion.id,
-                  fromKey: from,
-                  intoKey: into,
-                })
-              }
-              onUnmerge={(key) =>
-                unmergeAnswerGroup({
-                  questionId: currentQuestion.id,
-                  groupKey: key,
-                })
-              }
-              onReveal={() => revealQuestion(currentQuestion.id)}
-            />
           )}
 
           {currentQuestion.state === "revealed" && (
@@ -691,46 +674,6 @@ function AnswerProgress({ count, total }: { count: number; total: number }) {
         className="h-full bg-blush-deep rounded-pill"
       />
     </div>
-  );
-}
-
-function ReviewScreen({
-  questionId: _questionId,
-  prompt,
-  groups,
-  playerLookup,
-  onMerge,
-  onUnmerge,
-  onReveal,
-}: {
-  questionId: string;
-  prompt: string;
-  groups: ReturnType<typeof groupAnswers>;
-  playerLookup: Map<string, { name: string; rank: number }>;
-  onMerge: (fromKey: string, intoKey: string) => Promise<void>;
-  onUnmerge: (key: string) => Promise<void>;
-  onReveal: () => Promise<void>;
-}) {
-  return (
-    <>
-      <Card className="mb-4">
-        <h2 className="font-display text-2xl font-bold text-center">
-          {prompt}
-        </h2>
-      </Card>
-      <AnswerGroupsPanel
-        groups={groups}
-        playerLookup={playerLookup}
-        onMerge={onMerge}
-        onUnmerge={onUnmerge}
-        hint="Tap two groups to merge them. Tap × to split a merged group."
-      />
-      <div className="flex justify-center gap-2">
-        <Button onClick={onReveal} size="lg">
-          Reveal answers ✨
-        </Button>
-      </div>
-    </>
   );
 }
 

@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { Reorder, useDragControls } from "framer-motion";
 import { GripVertical } from "lucide-react";
 import { Button, Card, Logo, Pill } from "@/app/_components/ui";
+import { QuestionLibrary } from "@/app/_components/QuestionLibrary";
 import { createGame } from "@/lib/actions";
 import { saveHostSecret } from "@/lib/session/storage";
 import { removeAllBots } from "@/lib/dev/bots";
@@ -190,6 +191,15 @@ function HostNewInner() {
           ))}
         </Reorder.Group>
       </Card>
+
+      <QuestionLibrary
+        currentPrompts={prompts.map((p) => p.text)}
+        onAdd={(prompt) => {
+          const item = makeItem(prompt);
+          setPrompts((p) => [...p, item]);
+        }}
+        className="mb-6"
+      />
 
       {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
 
