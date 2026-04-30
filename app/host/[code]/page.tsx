@@ -10,6 +10,7 @@ import { Lobby } from "@/app/_components/Lobby";
 import { Reactions } from "@/app/_components/Reactions";
 import { RevealStage } from "@/app/_components/RevealStage";
 import { Standings } from "@/app/_components/Standings";
+import { SoundToggle } from "@/app/_components/SoundToggle";
 import { useGameChannel } from "@/lib/supabase/realtime";
 import { getSupabase } from "@/lib/supabase/client";
 import { groupAnswers } from "@/lib/scoring/normalize";
@@ -25,6 +26,7 @@ import {
 } from "@/lib/actions";
 import { getHostSecret } from "@/lib/session/storage";
 import { joinNames, tieRanks } from "@/lib/utils";
+import { playFanfare } from "@/lib/sounds";
 import {
   addBot,
   botAnswerNow,
@@ -145,6 +147,7 @@ export default function HostGamePage({
         <Logo compact={game.status === "active"} />
         <div className="flex items-center gap-2 min-w-0">
           {game.status === "active" && <CompactShare code={code} />}
+          <SoundToggle />
           <Pill tone="lavender">HOST</Pill>
         </div>
       </header>
@@ -849,6 +852,9 @@ function FinalLeaderboard({
   partyMode?: boolean;
 }) {
   const router = useRouter();
+  useEffect(() => {
+    playFanfare();
+  }, []);
   const sorted = [...players].sort(
     (a, b) => (totals.get(b.id) ?? 0) - (totals.get(a.id) ?? 0),
   );

@@ -8,6 +8,7 @@ import { Lobby } from "@/app/_components/Lobby";
 import { Reactions } from "@/app/_components/Reactions";
 import { RevealStage } from "@/app/_components/RevealStage";
 import { Standings } from "@/app/_components/Standings";
+import { SoundToggle } from "@/app/_components/SoundToggle";
 import { useRouter } from "next/navigation";
 import { useGameChannel } from "@/lib/supabase/realtime";
 import { groupAnswers } from "@/lib/scoring/normalize";
@@ -27,6 +28,7 @@ import {
 } from "@/lib/session/storage";
 import { AVATAR_EMOJI } from "@/lib/avatars";
 import { joinNames, tieRanks } from "@/lib/utils";
+import { playFanfare } from "@/lib/sounds";
 import type { Game } from "@/lib/types";
 
 export default function PlayPage({
@@ -257,6 +259,7 @@ function PlayInGame({
       <header className="flex items-center justify-between mb-4">
         <Logo />
         <div className="flex gap-2 items-center">
+          <SoundToggle />
           <Pill tone="mint">{totals.get(playerId) ?? 0} pts</Pill>
           <Pill tone="lavender">{code}</Pill>
         </div>
@@ -504,6 +507,9 @@ function FinalLeaderboard({
   totals: Map<string, number>;
   selfId: string;
 }) {
+  useEffect(() => {
+    playFanfare();
+  }, []);
   const sorted = [...players].sort(
     (a, b) => (totals.get(b.id) ?? 0) - (totals.get(a.id) ?? 0),
   );

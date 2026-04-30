@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { AnswerGroup, RoundScore } from "@/lib/types";
 import { pointsForRank, computeRanks } from "@/lib/scoring/normalize";
+import { playRevealTier, playTabulating } from "@/lib/sounds";
 
 interface RevealRow {
   rank: number;
@@ -64,6 +65,7 @@ export function RevealStage({
       setRevealedRanks(rows.map((r) => r.rank));
       return;
     }
+    playTabulating();
     const ttab = setTimeout(() => setPhase("revealing"), 1200);
     return () => clearTimeout(ttab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,6 +90,7 @@ export function RevealStage({
       }
       const rank = order[i].rank;
       setRevealedRanks((r) => [...r, rank]);
+      playRevealTier(rank);
       i += 1;
       timeoutId = setTimeout(tick, 900);
     };
