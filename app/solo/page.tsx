@@ -191,15 +191,14 @@ function SoloRunner({ setup }: { setup: SoloSetup }) {
     [snapshot.answers, currentQuestion, setup.userPlayerId],
   );
 
-  // Auto-start once everyone (you + 15 bots) is in the lobby.
+  // Everyone's already inserted (createSoloGame awaited each row). Don't
+  // wait for realtime to deliver the initial snapshot — just kick the
+  // game off so the player isn't stuck staring at a "loading" state.
   useEffect(() => {
-    if (!snapshot.game) return;
-    if (snapshot.game.status !== "lobby") return;
     if (startedRef.current) return;
-    if (snapshot.players.length < 1 + setup.bots.length) return;
     startedRef.current = true;
-    startGame(snapshot.game.id);
-  }, [snapshot.game, snapshot.players.length, setup.bots.length]);
+    startGame(setup.game.id);
+  }, [setup.game.id]);
 
   // Bots auto-answer when a question opens.
   useEffect(() => {
@@ -263,15 +262,14 @@ function SoloRunner({ setup }: { setup: SoloSetup }) {
 
       {game.status === "lobby" && (
         <Card className="text-center">
-          <p className="text-xs uppercase tracking-widest text-ink-soft">
-            Setting up
-          </p>
-          <p className="font-display text-2xl mt-1">
-            Filling the room with bots…
-          </p>
-          <p className="text-ink-soft text-sm mt-2">
-            {snapshot.players.length} of {1 + setup.bots.length} ready
-          </p>
+          <motion.div
+            animate={{ rotate: [0, -8, 8, 0] }}
+            transition={{ repeat: Infinity, duration: 1.4 }}
+            className="text-5xl mb-2"
+          >
+            🎈
+          </motion.div>
+          <p className="font-display text-2xl">Starting up…</p>
         </Card>
       )}
 
