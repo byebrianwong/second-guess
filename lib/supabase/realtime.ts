@@ -136,7 +136,16 @@ export function useGameChannel(gameId: string | null) {
           });
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        // Re-sync once the channel is fully subscribed. There's a race
+        // between the initial fetch and the channel actually subscribing
+        // — any updates that land in that gap aren't delivered. Hitting
+        // loadInitial again on SUBSCRIBED guarantees the snapshot reflects
+        // the post-subscribe DB state.
+        if (status === "SUBSCRIBED") {
+          loadInitial();
+        }
+      });
 
     return () => {
       cancelled = true;
