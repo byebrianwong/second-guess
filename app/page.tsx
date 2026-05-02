@@ -102,6 +102,13 @@ export default function Home() {
           </Button>
         </Link>
       </motion.div>
+
+      <Link
+        href="/solo"
+        className="mt-6 text-xs text-ink-soft underline underline-offset-4 hover:text-ink transition"
+      >
+        or play a quick solo game vs. 15 bots →
+      </Link>
     </main>
   );
 }
