@@ -231,7 +231,8 @@ function SoloRunner({ setup }: { setup: SoloSetup }) {
     return () => clearTimeout(t);
   }, [currentAnswers.length, snapshot.players.length, currentQuestion]);
 
-  // Auto-advance once the reveal has had time to play out.
+  // Auto-advance once the reveal has had time to play out — give people
+  // time to read the bars + leaderboard before snapping to the next round.
   useEffect(() => {
     if (!snapshot.game) return;
     if (!currentQuestion || currentQuestion.state !== "revealed") return;
@@ -243,7 +244,7 @@ function SoloRunner({ setup }: { setup: SoloSetup }) {
         currentRound: snapshot.game!.current_round,
         totalQuestions,
       });
-    }, 7000);
+    }, 15000);
     return () => clearTimeout(t);
   }, [currentQuestion, snapshot.game, totalQuestions]);
 
