@@ -31,8 +31,14 @@ export function useGameChannel(gameId: string | null) {
 
     const supabase = getSupabase();
     let cancelled = false;
+    // Sequence number: increments with each loadInitial call. If a fetch
+    // returns and a NEWER loadInitial has since been started, drop the
+    // result — otherwise the slow earlier fetch can overwrite the latest
+    // snapshot with stale data.
+    let loadSeq = 0;
 
     async function loadInitial() {
+      const seq = ++loadSeq;
       const [g, q, p, a, s] = await Promise.all([
         supabase.from("games").select("*").eq("id", gameId).maybeSingle(),
         supabase
@@ -51,6 +57,7 @@ export function useGameChannel(gameId: string | null) {
           .eq("questions.game_id", gameId),
       ]);
       if (cancelled) return;
+      if (seq !== loadSeq) return; // a newer load is in flight; drop ours
       setSnapshot({
         game: (g.data as Game) ?? null,
         questions: (q.data as Question[]) ?? [],
