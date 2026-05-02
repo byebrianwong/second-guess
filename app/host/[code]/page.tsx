@@ -554,6 +554,7 @@ function BotPanel({
   currentQuestion: {
     id: string;
     state: string;
+    prompt: string;
   } | null;
 }) {
   const [open, setOpen] = useState(false);
@@ -569,6 +570,7 @@ function BotPanel({
   useEffect(() => {
     if (!currentQuestion || currentQuestion.state !== "open") return;
     const qid = currentQuestion.id;
+    const prompt = currentQuestion.prompt;
     const fresh = getBots(code);
     if (fresh.length === 0) return;
 
@@ -579,14 +581,14 @@ function BotPanel({
       answeredRef.current.add(key);
       const delay = 400 + Math.random() * 2600;
       const t = setTimeout(() => {
-        botAnswerNow({ questionId: qid, bot });
+        botAnswerNow({ questionId: qid, prompt, bot });
       }, delay);
       timeouts.push(t);
     }
     return () => {
       for (const t of timeouts) clearTimeout(t);
     };
-  }, [currentQuestion?.id, currentQuestion?.state, code]);
+  }, [currentQuestion?.id, currentQuestion?.state, currentQuestion?.prompt, code]);
 
   async function add(n: number) {
     setBusy(true);
