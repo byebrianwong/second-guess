@@ -222,6 +222,11 @@ const TOPICS: Topic[] = [
     heavy: ["Goldfish", "Pretzels"],
     pool: ["Goldfish", "Pretzels", "Beef jerky", "Gum", "Sunflower seeds", "Trail mix"],
   },
+  {
+    match: /snack.*steal|secretly steal|halloween candy/i,
+    heavy: ["Goldfish", "Halloween candy"],
+    pool: ["Goldfish", "Halloween candy", "Fruit snacks", "Cheez-its", "Animal crackers", "Cookies", "Juice box"],
+  },
 
   // ── pop culture ───────────────────────────────────────
   {
