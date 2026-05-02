@@ -244,7 +244,7 @@ function SoloRunner({ setup }: { setup: SoloSetup }) {
         currentRound: snapshot.game!.current_round,
         totalQuestions,
       });
-    }, 15000);
+    }, 12000);
     return () => clearTimeout(t);
   }, [currentQuestion, snapshot.game, totalQuestions]);
 
