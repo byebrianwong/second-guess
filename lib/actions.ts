@@ -2,6 +2,8 @@
 
 import { getSupabase } from "./supabase/client";
 import { normalize } from "./scoring/normalize";
+import { addBot, type BotPlayer } from "./dev/bots";
+import { QUESTION_LIBRARY } from "./data/question-library";
 import type { Game, Question, Player } from "./types";
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ"; // no I/O/L
@@ -104,6 +106,69 @@ export async function createGame(opts: {
   if (qErr) throw new Error(`Failed to insert questions: ${qErr.message}`);
 
   return { game, questions: (qs as Question[]) ?? [] };
+}
+
+/**
+ * Pick `count` distinct prompts from the question library, biased toward
+ * one-per-category so the solo round feels varied.
+ */
+function pickRandomLibraryPrompts(count: number): string[] {
+  const cats = [...QUESTION_LIBRARY].sort(() => Math.random() - 0.5);
+  const picked = new Set<string>();
+  for (const cat of cats) {
+    if (picked.size >= count) break;
+    const shuffled = [...cat.questions].sort(() => Math.random() - 0.5);
+    for (const q of shuffled) {
+      if (picked.has(q)) continue;
+      picked.add(q);
+      break;
+    }
+  }
+  while (picked.size < count) {
+    const cat = QUESTION_LIBRARY[Math.floor(Math.random() * QUESTION_LIBRARY.length)];
+    const q = cat.questions[Math.floor(Math.random() * cat.questions.length)];
+    picked.add(q);
+  }
+  return Array.from(picked);
+}
+
+/**
+ * Spin up a solo game: random questions, the calling user as a player,
+ * plus a bench of bots that will auto-answer once the game starts.
+ *
+ * Returns everything the caller needs to drive the game from one tab —
+ * the host_secret (saved to localStorage so they can also act as host)
+ * and the user's player id.
+ */
+export async function createSoloGame(opts: {
+  playerName: string;
+  playerAvatar: string;
+  questionCount?: number;
+  botCount?: number;
+}): Promise<{
+  game: Game;
+  questions: Question[];
+  userPlayerId: string;
+  bots: BotPlayer[];
+}> {
+  const prompts = pickRandomLibraryPrompts(opts.questionCount ?? 5);
+  const { game, questions } = await createGame({ prompts, theme: "solo" });
+
+  const userPlayerId = crypto.randomUUID();
+  await joinGame({
+    gameId: game.id,
+    playerId: userPlayerId,
+    name: opts.playerName,
+    avatar: opts.playerAvatar,
+  });
+
+  const botCount = opts.botCount ?? 15;
+  const bots: BotPlayer[] = [];
+  for (let i = 0; i < botCount; i++) {
+    bots.push(await addBot({ gameId: game.id, code: game.code }));
+  }
+
+  return { game, questions, userPlayerId, bots };
 }
 
 export async function getGameByCode(code: string): Promise<Game | null> {
