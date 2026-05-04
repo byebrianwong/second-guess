@@ -3,7 +3,10 @@ import HomePage from "@/app/page";
 
 const meta: Meta = {
   title: "Pages / Landing",
-  parameters: { layout: "fullscreen" },
+  // appDirectory tells the Next.js framework mock to provide the App
+  // Router context (next/navigation). Without it, useRouter() throws
+  // "invariant expected app router to be mounted" at render.
+  parameters: { layout: "fullscreen", nextjs: { appDirectory: true } },
   component: HomePage,
 };
 

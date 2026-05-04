@@ -3,7 +3,12 @@ import HostNewPage from "@/app/host/new/page";
 
 const meta: Meta = {
   title: "Pages / Host setup",
-  parameters: { layout: "fullscreen" },
+  // appDirectory: true loads the App Router mock so useRouter() and
+  // useSearchParams() resolve without throwing.
+  parameters: {
+    layout: "fullscreen",
+    nextjs: { appDirectory: true },
+  },
   component: HostNewPage,
 };
 
@@ -19,6 +24,9 @@ export const Regular: Story = {};
  */
 export const PartyMode: Story = {
   parameters: {
-    nextjs: { navigation: { query: { party: "1" } } },
+    nextjs: {
+      appDirectory: true,
+      navigation: { query: { party: "1" } },
+    },
   },
 };
